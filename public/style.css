@@ -1,0 +1,195 @@
+:root {
+  --felt: #0f7a45;
+  --felt-dark: #0a5a33;
+  --rail: #4a2c17;
+  --rail-light: #6b3f22;
+  --gold: #d9b45a;
+  --bg: #12161c;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  height: 100%;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  background: radial-gradient(circle at 50% 20%, #1c2530, var(--bg));
+  color: #eee;
+  overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.hidden { display: none !important; }
+
+/* ----- Overlays (lobby / fim) ----- */
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(8, 11, 15, 0.85);
+  backdrop-filter: blur(4px);
+  z-index: 20;
+  padding: 20px;
+}
+
+.panel {
+  background: #1b222c;
+  border: 1px solid #2c3644;
+  border-radius: 16px;
+  padding: 28px 26px;
+  width: 100%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.panel h1 {
+  font-size: 28px;
+  margin-bottom: 6px;
+  letter-spacing: -0.5px;
+}
+.panel h1 span { color: var(--gold); }
+.panel .sub { color: #9aa7b6; font-size: 14px; margin-bottom: 20px; }
+
+.panel label {
+  display: block;
+  text-align: left;
+  font-size: 13px;
+  color: #9aa7b6;
+  margin-bottom: 14px;
+}
+
+.panel input {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid #333e4d;
+  background: #10151c;
+  color: #fff;
+  font-size: 16px;
+}
+.panel input:focus { outline: none; border-color: var(--gold); }
+
+.panel button {
+  width: 100%;
+  margin-top: 6px;
+  padding: 13px;
+  border: none;
+  border-radius: 10px;
+  background: linear-gradient(180deg, var(--gold), #b8933f);
+  color: #241a06;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.08s;
+}
+.panel button:active { transform: scale(0.98); }
+
+.msg { margin-top: 14px; font-size: 14px; min-height: 18px; color: var(--gold); }
+.hint { margin-top: 18px; font-size: 12px; color: #66727f; line-height: 1.5; }
+
+/* ----- HUD ----- */
+#game { height: 100%; display: flex; flex-direction: column; }
+
+#hud {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  gap: 10px;
+  background: #161c24;
+  border-bottom: 1px solid #262f3b;
+}
+
+.player { display: flex; flex-direction: column; gap: 3px; min-width: 90px; }
+.player.right { align-items: flex-end; text-align: right; }
+.player .pname { font-weight: 700; font-size: 15px; }
+.player .pgroup { font-size: 12px; color: var(--gold); min-height: 14px; }
+.player .pballs { font-size: 14px; letter-spacing: 1px; min-height: 16px; }
+.player.active { background: rgba(217, 180, 90, 0.12); border-radius: 8px; padding: 4px 8px; }
+
+.center { flex: 1; text-align: center; }
+#status { font-size: 14px; color: #cfd8e3; font-weight: 600; }
+
+#powerbar {
+  margin: 6px auto 0;
+  width: 140px;
+  height: 6px;
+  background: #232c37;
+  border-radius: 4px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+#powerbar.show { opacity: 1; }
+#powerfill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, #4bd06a, #d9c14b, #d9524b);
+  transition: width 0.03s linear;
+}
+
+/* ----- Efeito (offset a,b na bola branca) ----- */
+#englishPicker {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  margin: 8px auto 0;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 32%, #fff 0%, #d8d8d8 55%, #9a9a9a 100%);
+  border: 1px solid #4a5563;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.4);
+  cursor: pointer;
+  touch-action: none;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s;
+}
+#englishPicker.show { opacity: 1; pointer-events: auto; }
+#englishPicker::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+}
+#englishDot {
+  position: absolute;
+  width: 9px;
+  height: 9px;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background: var(--gold);
+  border: 1px solid #6b4f18;
+  pointer-events: none;
+}
+
+/* ----- Mesa ----- */
+#tableWrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  min-height: 0;
+}
+#table {
+  touch-action: none;
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.55);
+}
+
+#foot {
+  text-align: center;
+  padding: 8px;
+  font-size: 12px;
+  color: #66727f;
+  background: #161c24;
+  border-top: 1px solid #262f3b;
+}

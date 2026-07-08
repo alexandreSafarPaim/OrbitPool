@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>🎱 Bilhar Multiplayer</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <!-- Tela inicial / lobby -->
+  <div id="lobby" class="overlay">
+    <div class="panel">
+      <h1>🎱 Bilhar <span>Multiplayer</span></h1>
+      <p class="sub">8-Ball em tempo real. Entre na mesma sala que um amigo.</p>
+      <label>Seu nome
+        <input id="name" type="text" maxlength="20" placeholder="Ex: Alex" />
+      </label>
+      <label>Sala
+        <input id="room" type="text" maxlength="24" placeholder="Ex: sala1" />
+      </label>
+      <button id="joinBtn">Entrar na sala</button>
+      <p id="lobbyMsg" class="msg"></p>
+      <p class="hint">Dica: compartilhe o nome da sala com o adversário. Você também pode abrir em duas abas para testar.</p>
+      <p class="hint">✨ Novidade: experimente a <a href="index3d.html" style="color:#8fd0a8">versão 3D</a>.</p>
+    </div>
+  </div>
+
+  <!-- HUD do jogo -->
+  <div id="game" class="hidden">
+    <header id="hud">
+      <div class="player" id="p1">
+        <span class="pname">Jogador 1</span>
+        <span class="pgroup" id="p1group"></span>
+        <span class="pballs" id="p1balls"></span>
+      </div>
+      <div class="center">
+        <div id="status">Aguardando...</div>
+        <div id="powerbar"><div id="powerfill"></div></div>
+        <div id="englishPicker" title="Efeito na bola branca (arraste)">
+          <div id="englishDot"></div>
+        </div>
+      </div>
+      <div class="player right" id="p2">
+        <span class="pname">Jogador 2</span>
+        <span class="pgroup" id="p2group"></span>
+        <span class="pballs" id="p2balls"></span>
+      </div>
+    </header>
+
+    <div id="tableWrap">
+      <canvas id="table"></canvas>
+    </div>
+
+    <footer id="foot">
+      <span id="hintText">Arraste para trás da bola branca e solte para dar a tacada.</span>
+    </footer>
+  </div>
+
+  <!-- Overlay de fim de jogo -->
+  <div id="endOverlay" class="overlay hidden">
+    <div class="panel">
+      <h1 id="endTitle">Fim de jogo</h1>
+      <p id="endMsg" class="sub"></p>
+      <button id="rematchBtn">Jogar de novo</button>
+      <p id="rematchMsg" class="msg"></p>
+    </div>
+  </div>
+
+  <script src="physics.js"></script>
+  <script src="game.js"></script>
+</body>
+</html>

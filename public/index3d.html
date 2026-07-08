@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>🎱 Bilhar 3D</title>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0e14;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #eee; }
+    #c { position: fixed; inset: 0; display: block; }
+
+    .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #16324a, #070b12 70%); z-index: 20; }
+    .overlay.hidden { display: none; }
+    .panel { background: #10161f; border: 1px solid #24303f; border-radius: 16px; padding: 28px 26px;
+      width: min(92vw, 380px); box-shadow: 0 20px 60px rgba(0,0,0,.5); text-align: center; }
+    .panel h1 { margin: 0 0 4px; font-size: 26px; }
+    .panel h1 span { color: #37b26b; }
+    .panel .sub { color: #9fb0c3; font-size: 14px; margin: 0 0 18px; }
+    label { display: block; text-align: left; font-size: 13px; color: #9fb0c3; margin: 10px 0 4px; }
+    input { width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid #2b3949;
+      background: #0b1017; color: #fff; font-size: 15px; }
+    button { cursor: pointer; border: 0; border-radius: 10px; padding: 12px 16px; font-size: 15px;
+      font-weight: 600; background: #2f9e5a; color: #fff; margin-top: 16px; width: 100%; }
+    button:hover { background: #37b26b; }
+    .msg { color: #9fb0c3; font-size: 13px; min-height: 18px; margin: 12px 0 0; }
+    .hint { color: #6b7c90; font-size: 12px; margin-top: 12px; }
+
+    /* HUD */
+    #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+    #topbar { position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      display: flex; gap: 14px; align-items: center; background: rgba(10,14,20,.7);
+      border: 1px solid #24303f; border-radius: 999px; padding: 6px 16px; font-size: 13px; }
+    .pill { display: flex; flex-direction: column; align-items: center; line-height: 1.2; }
+    .pill.active .pn { color: #7fe3a6; }
+    .pn { font-weight: 700; }
+    .pg { font-size: 11px; color: #8fa1b5; }
+    #status { position: absolute; bottom: 74px; left: 50%; transform: translateX(-50%);
+      background: rgba(10,14,20,.7); border: 1px solid #24303f; border-radius: 999px;
+      padding: 8px 18px; font-size: 14px; max-width: 92vw; text-align: center; }
+    #powerWrap { position: absolute; left: 16px; top: 50%; transform: translateY(-50%);
+      width: 16px; height: 200px; background: rgba(10,14,20,.6); border: 1px solid #24303f;
+      border-radius: 10px; overflow: hidden; display: none; }
+    #powerWrap.show { display: block; }
+    #powerFill { position: absolute; bottom: 0; left: 0; right: 0; height: 0%;
+      background: linear-gradient(#ffe08a, #ff7a3c, #e23b3b); }
+    /* Painel de atalhos (topo-direita, translúcido, colapsável com H) */
+    #keys { position: absolute; right: 12px; top: 12px;
+      background: rgba(10,14,20,.6); border: 1px solid #24303f; border-radius: 12px;
+      padding: 10px 12px; font-size: 12px; line-height: 1.9; color: #cfe1f0; max-width: 250px; }
+    #keys .k { display: inline-block; min-width: 58px; padding: 1px 7px; margin-right: 8px;
+      background: #26374a; border-radius: 5px; text-align: center; color: #fff; font-weight: 700; }
+    #keys h4 { margin: 0; font-size: 12px; color: #8fa1b5; text-transform: uppercase; letter-spacing: .5px; }
+    #keys h4 span { color: #5f7286; font-weight: 600; }
+    #keys .krows { margin-top: 8px; }
+    #keys.collapsed .krows { display: none; }
+    /* Ponto de contato (bola grande no centro ao segurar Shift) */
+    #contact { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: 220px; height: 220px; border-radius: 50%; display: none;
+      background: radial-gradient(circle at 38% 32%, #ffffff, #dcdcd4 68%, #b6b6ae);
+      border: 3px solid rgba(0,0,0,.25); box-shadow: 0 14px 50px rgba(0,0,0,.55); }
+    #contact.show { display: block; }
+    #contactDot { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: #e23b3b;
+      left: 50%; top: 50%; transform: translate(-50%,-50%); box-shadow: inset 0 0 0 3px rgba(0,0,0,.15); }
+    #contactLbl { position: absolute; left: 0; right: 0; bottom: -30px; text-align: center; font-size: 12px; color: #cfe1f0; }
+    .tag { position: absolute; top: 10px; left: 12px; font-size: 12px; color: #6b7c90; }
+    .tag a { color: #8fa1b5; }
+  </style>
+</head>
+<body>
+  <canvas id="c"></canvas>
+
+  <div id="hud">
+    <div class="tag">🎱 Bilhar 3D — <a href="index.html">versão 2D</a></div>
+    <div id="topbar">
+      <div class="pill" id="p1"><span class="pn">Jogador 1</span><span class="pg" id="p1g"></span></div>
+      <div style="opacity:.4">vs</div>
+      <div class="pill" id="p2"><span class="pn">Jogador 2</span><span class="pg" id="p2g"></span></div>
+    </div>
+    <div id="status">Conectando...</div>
+    <div id="powerWrap"><div id="powerFill"></div></div>
+    <div id="contact"><div id="contactDot"></div><div id="contactLbl">efeito / ponto de contato</div></div>
+    <div id="keys">
+      <h4>Controles <span>(H oculta)</span></h4>
+      <div class="krows">
+        <div><span class="k">Clique</span>travar cursor</div>
+        <div><span class="k">Mouse</span>girar o taco</div>
+        <div><span class="k">Ctrl</span>segurar + puxar = força; soltar = tacar</div>
+        <div><span class="k">Shift</span>ajustar efeito</div>
+        <div><span class="k">Tab</span>ver de cima</div>
+        <div><span class="k">Scroll</span>zoom</div>
+        <div><span class="k">Esc</span>liberar cursor</div>
+      </div>
+    </div>
+  </div>
+
+  <div id="lobby" class="overlay">
+    <div class="panel">
+      <h1>🎱 Bilhar <span>3D</span></h1>
+      <p class="sub">8-Ball em 3D, multiplayer em tempo real.</p>
+      <label>Seu nome<input id="name" maxlength="20" placeholder="Ex: Alex" /></label>
+      <label>Sala<input id="room" maxlength="24" value="sala1" /></label>
+      <button id="joinBtn">Entrar na sala</button>
+      <p id="lobbyMsg" class="msg"></p>
+      <p class="hint">Abra em duas abas com o mesmo nome de sala para testar. Clique na tela para travar o cursor (Esc libera). Mova o mouse para girar o taco (infinito); segure <b>Ctrl</b> e puxe o mouse para trás para dar força; solte o Ctrl para tacar. Botão "Visão" alterna Taco/Órbita; role para zoom.</p>
+    </div>
+  </div>
+
+  <div id="endOverlay" class="overlay hidden">
+    <div class="panel">
+      <h1 id="endTitle">Fim de jogo</h1>
+      <p id="endMsg" class="sub"></p>
+      <button id="rematchBtn">Jogar de novo</button>
+      <p id="rematchMsg" class="msg"></p>
+    </div>
+  </div>
+
+  <script>
+    // Carregamento resiliente do Three.js: tenta um arquivo LOCAL (se você
+    // baixou three.min.js na pasta public/) e, se não houver, vários CDNs em
+    // sequência. Assim não depende de um CDN específico que o navegador/extensão
+    // possa bloquear. Se nada carregar, mostra um erro claro no lobby.
+    (function () {
+      var SRCS = [
+        'three.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+        'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+        'https://unpkg.com/three@0.128.0/build/three.min.js'
+      ];
+      function fail(msg) {
+        var el = document.getElementById('lobbyMsg');
+        if (el) el.textContent = msg;
+      }
+      function loadScript(src, ok, err) {
+        var s = document.createElement('script');
+        s.src = src; s.onload = ok; s.onerror = err;
+        document.head.appendChild(s);
+      }
+      function tryThree(i) {
+        if (i >= SRCS.length) { fail('Não consegui carregar a engine 3D (Three.js). Desative bloqueadores/extensões para localhost, ou baixe o three.min.js para a pasta do jogo.'); return; }
+        loadScript(SRCS[i], function () {
+          if (window.THREE) startApp(); else tryThree(i + 1);
+        }, function () { tryThree(i + 1); });
+      }
+      // OBJLoader (opcional): para a mesa em modelo 3D. Se não carregar, o jogo
+      // segue com a mesa procedural.
+      var OBJ_SRCS = [
+        'OBJLoader.js',
+        'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js',
+        'https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js'
+      ];
+      function loadObjLoader(done) {
+        (function tryO(i) {
+          if (i >= OBJ_SRCS.length) { done(); return; }
+          loadScript(OBJ_SRCS[i], function () { if (THREE.OBJLoader) done(); else tryO(i + 1); }, function () { tryO(i + 1); });
+        })(0);
+      }
+      function startApp() {
+        loadObjLoader(function () {
+          loadScript('physics.js', function () {
+            // Colisor extraído do modelo (opcional). Se falhar, usa o analítico.
+            var g = function () { loadScript('game3d.js', function () {}, function () { fail('Falha ao carregar game3d.js'); }); };
+            loadScript('table3d_collider.js', g, g);
+          }, function () { fail('Falha ao carregar physics.js'); });
+        });
+      }
+      tryThree(0);
+    })();
+  </script>
+</body>
+</html>
