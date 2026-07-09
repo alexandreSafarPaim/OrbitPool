@@ -43,15 +43,17 @@ window.OrbitAudio = (function () {
   let musicEl = null, musicSrcNode = null, musicIdx = 0;
   let lastAt = 0, burst = 0;
 
-  // --- persistência ---
+  // --- persistência (volumes, mudo e última faixa tocada) ---
+  let savedTrack = -1;
   try {
     const s = JSON.parse(localStorage.getItem(LSKEY) || '{}');
     if (s && typeof s === 'object') {
       ['master', 'sfx', 'music'].forEach((k) => { if (typeof s[k] === 'number') vol[k] = s[k]; });
       if (typeof s.muted === 'boolean') muted = s.muted;
+      if (typeof s.track === 'number' && s.track >= 0 && s.track < MUSIC_TRACKS.length) savedTrack = s.track;
     }
   } catch (e) {}
-  function persist() { try { localStorage.setItem(LSKEY, JSON.stringify({ ...vol, muted })); } catch (e) {} }
+  function persist() { try { localStorage.setItem(LSKEY, JSON.stringify({ ...vol, muted, track: musicIdx })); } catch (e) {} }
 
   function ensure() {
     if (ctx) return true;
@@ -172,12 +174,14 @@ window.OrbitAudio = (function () {
     if (!musicEl) return;
     musicIdx = (musicIdx + 1) % MUSIC_TRACKS.length;
     musicEl.src = MUSIC_TRACKS[musicIdx];
+    persist(); // lembra a faixa p/ próxima sessão
     playCurrent();
   }
   function startMusic() {
     if (!ensure() || muted || vol.music <= 0) return;
     if (!musicEl) {
-      musicIdx = Math.floor(Math.random() * MUSIC_TRACKS.length); // começa numa faixa aleatória
+      // retoma a última faixa da sessão anterior; sem histórico, sorteia
+      musicIdx = savedTrack >= 0 ? savedTrack : Math.floor(Math.random() * MUSIC_TRACKS.length);
       musicEl = new Audio(MUSIC_TRACKS[musicIdx]);
       musicEl.preload = 'auto'; musicEl.crossOrigin = 'anonymous';
       musicEl.addEventListener('ended', nextTrack); // encadeia as 3 sem parar
@@ -200,6 +204,7 @@ window.OrbitAudio = (function () {
     if (!musicEl) { startMusic(); return musicInfo(); }
     musicIdx = (musicIdx + dir + MUSIC_TRACKS.length) % MUSIC_TRACKS.length;
     musicEl.src = MUSIC_TRACKS[musicIdx];
+    persist(); // lembra a faixa p/ próxima sessão
     playCurrent();
     return musicInfo();
   }

@@ -226,8 +226,8 @@ function handleMessage(conn, raw) {
       let room = rooms.get(roomId);
       if (!room) room = makeRoom(roomId, msg.slots | 0); // 1º a entrar (host) define 2 ou 4 vagas
 
-      if (room.clients.size >= room.slots || room.started) {
-        conn.send({ t: 'full' });
+      if (room.clients.size >= room.slots) {
+        conn.send({ t: 'full' }); // sem vaga (reconexão usa a vaga de quem caiu)
         return;
       }
 
@@ -239,7 +239,11 @@ function handleMessage(conn, raw) {
 
       conn.send({ t: 'joined', playerNo: conn.playerNo, room: roomId, name: conn.name, slots: room.slots });
 
-      if (room.slots === 2 && room.clients.size === 2) {
+      if (room.started) {
+        // RECONEXÃO em partida andando: avisa os demais — o menor nº presente
+        // responde com o snapshot ('resync') para quem voltou.
+        broadcastRoom(room, { t: 'rejoined', no: conn.playerNo, name: conn.name }, conn);
+      } else if (room.slots === 2 && room.clients.size === 2) {
         // 1v1: começa direto (comportamento original).
         room.started = true;
         const [a, b] = [...room.clients];

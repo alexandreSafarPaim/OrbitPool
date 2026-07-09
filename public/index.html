@@ -137,6 +137,9 @@
     /* ===================== LOBBY (menu do boteco) ===================== */
     #lobby { display: block; overflow: hidden; user-select: none; }
     #lobby.hidden { display: none; } /* id vence .overlay.hidden — precisa reafirmar */
+    .gpuSteps { margin: 6px 0 2px; padding: 10px 12px; border-radius: 9px; background: rgba(0,0,0,.35);
+      border: 1px dashed rgba(255,210,74,.4); font-family: 'Oswald', sans-serif; font-size: 13.5px;
+      letter-spacing: .03em; color: var(--accent); user-select: all; }
     #lobby .warmlight { position:absolute; top:-120px; left:50%; transform:translateX(-50%); width:900px; height:520px;
       background:radial-gradient(circle, rgba(255,180,70,.22), transparent 66%); filter:blur(10px); pointer-events:none; }
     #lobby .vignette { position:absolute; inset:0; background:radial-gradient(120% 80% at 50% 0%, transparent 40%, rgba(0,0,0,.5) 100%); pointer-events:none; }
@@ -569,6 +572,19 @@
         <button id="tlStart">Começar partida</button>
       </div>
       <p id="tlMsg" class="msg"></p>
+    </div>
+  </div>
+
+  <!-- aviso de aceleração gráfica desativada (WebGL por software) -->
+  <div id="gpuModal" class="overlay hidden" style="z-index:40">
+    <div class="panel">
+      <h1>🐢 Tá rodando no modo lento…</h1>
+      <p class="sub">A <b>aceleração gráfica</b> do seu navegador está desativada — o jogo funciona,
+        mas sem usar a placa de vídeo ele trava e engasga. Ativando, a experiência melhora <b>muito</b>.</p>
+      <div id="gpuSteps" class="gpuSteps"></div>
+      <button id="gpuOpenBtn">🔧 Abrir configurações do navegador</button>
+      <button id="gpuDismissBtn" class="tlGhost">Jogar assim mesmo</button>
+      <p class="hint">Ative “Usar aceleração de hardware quando disponível”, reinicie o navegador e volte aqui.</p>
     </div>
   </div>
 

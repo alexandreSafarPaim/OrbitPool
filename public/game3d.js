@@ -76,37 +76,84 @@ function initRenderer() {
   if (THREE.sRGBEncoding) renderer.outputEncoding = THREE.sRGBEncoding;
   return true;
 }
-function showWebGLError() {
-  const m = document.getElementById('lobbyMsg');
-  if (m) {
-    m.innerHTML = 'Este navegador está sem <b>WebGL</b> (aceleração de hardware desativada). Ative-a no Chrome e reinicie.';
-    const wrap = document.createElement('div');
-    wrap.style.cssText = 'margin-top:12px;display:flex;flex-direction:column;gap:8px';
-
-    const copyBtn = document.createElement('button');
-    copyBtn.textContent = '📋 Copiar link das configurações';
-    copyBtn.style.margin = '0';
-    copyBtn.onclick = () => {
-      const url = 'chrome://settings/system';
-      const done = () => { copyBtn.textContent = '✓ Copiado! Cole na barra de endereços e Enter'; };
-      const manual = () => { copyBtn.textContent = url + '  (copie manualmente)'; };
-      if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(manual);
-      else manual();
+// ===========================================================================
+// Aceleração gráfica: WebGL FUNCIONA, mas por SOFTWARE (SwiftShader/llvmpipe)?
+// Isso indica "Usar aceleração de hardware" desligado no navegador — o jogo
+// roda, mas engasga. Mostra um modal recomendando ativar.
+// ===========================================================================
+function detectSoftwareGL() {
+  try {
+    const gl = renderer && renderer.getContext ? renderer.getContext() : null;
+    if (!gl) return false;
+    const ext = gl.getExtension('WEBGL_debug_renderer_info');
+    const name = String(ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : (gl.getParameter(gl.RENDERER) || ''));
+    return /swiftshader|llvmpipe|softpipe|software\s?(rasterizer|renderer|adapter)|microsoft basic render/i.test(name);
+  } catch (e) { return false; }
+}
+// Página interna de configurações conforme o navegador.
+function gpuSettingsURL() {
+  const ua = navigator.userAgent;
+  if (/edg\//i.test(ua)) return 'edge://settings/system';
+  if (/opr\//i.test(ua)) return 'opera://settings/system';
+  if (/firefox/i.test(ua)) return 'about:preferences#general';
+  if (navigator.brave) return 'brave://settings/system';
+  return 'chrome://settings/system';
+}
+// Abre o modal de GPU com textos adaptados (usado nos DOIS casos: sem WebGL
+// nenhum, e WebGL rodando por software).
+function openGpuModal(title, subHTML, dismissLabel) {
+  const modal = document.getElementById('gpuModal');
+  if (!modal) return;
+  const h = modal.querySelector('h1'); if (h) h.textContent = title;
+  const sub = modal.querySelector('.sub'); if (sub) sub.innerHTML = subHTML;
+  const url = gpuSettingsURL();
+  const steps = document.getElementById('gpuSteps');
+  if (steps) steps.textContent = url;
+  const openBtn = document.getElementById('gpuOpenBtn');
+  if (openBtn) {
+    openBtn.textContent = '🔧 Abrir configurações do navegador';
+    openBtn.onclick = () => {
+      // Tenta abrir em nova aba; navegadores BLOQUEIAM abrir páginas internas
+      // (chrome:// etc.) a partir de sites — nesse caso, copia o endereço e
+      // orienta a colar numa aba nova.
+      let w = null;
+      try { w = window.open(url, '_blank'); } catch (e) { w = null; }
+      if (!w) {
+        const done = () => { openBtn.textContent = '✓ Endereço copiado! Cola numa aba nova'; };
+        if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(done);
+        else done();
+      }
     };
-
-    const tip = document.createElement('div');
-    tip.className = 'hint';
-    tip.innerHTML = 'Cole na barra de endereços, ligue <b>"Usar aceleração de hardware quando disponível"</b> e reinicie o Chrome. Confira em <b>chrome://gpu</b>. (O Chrome não deixa esta página abrir <i>chrome://</i> direto — por isso o botão copia o endereço.)';
-
-    wrap.appendChild(copyBtn); wrap.appendChild(tip);
-    m.parentNode.appendChild(wrap);
   }
-  ['joinBtn', 'createBtn'].forEach((id) => {
+  const dis = document.getElementById('gpuDismissBtn');
+  if (dis) { dis.textContent = dismissLabel; dis.onclick = () => modal.classList.add('hidden'); }
+  modal.classList.remove('hidden');
+}
+
+function maybeWarnSoftwareGL() {
+  if (!detectSoftwareGL()) return;
+  openGpuModal(
+    '🐢 Tá rodando no modo lento…',
+    'A <b>aceleração gráfica</b> do seu navegador está desativada — o jogo funciona, ' +
+    'mas sem usar a placa de vídeo ele trava e engasga. Ativando, a experiência melhora <b>muito</b>.',
+    'Jogar assim mesmo');
+}
+
+// WebGL indisponível de vez: mesmo modal, botões desabilitados (sem trocar
+// os rótulos — o jogo simplesmente não tem como rodar sem WebGL).
+function showWebGLError() {
+  ['joinBtn', 'createBtn', 'createBtn2'].forEach((id) => {
     const b = document.getElementById(id);
-    if (b) { b.disabled = true; b.style.opacity = 0.5; }
+    if (b) b.disabled = true;
   });
-  const cb = document.getElementById('createBtn');
-  if (cb) cb.textContent = 'WebGL indisponível';
+  document.querySelectorAll('.botLvl').forEach((b) => { b.disabled = true; });
+  setLobbyMsg('⚠️ Sem WebGL o jogo não roda — ative a aceleração gráfica e recarregue.');
+  openGpuModal(
+    '😵 Este navegador está sem WebGL',
+    'O jogo é 3D e precisa de <b>WebGL</b> para desenhar a mesa — normalmente ele some quando a ' +
+    '<b>aceleração de hardware</b> do navegador está desativada. Ative, reinicie o navegador e recarregue esta página. ' +
+    'Dá pra conferir o estado em <b>chrome://gpu</b>.',
+    'Entendi');
 }
 
 const scene = new THREE.Scene();
@@ -528,6 +575,8 @@ function endShot() {
   // Bola na mão: libera o cursor (visão de cima) para posicionar pelo feltro.
   if (ballInHand && currentTurn === myNo) exitLock();
   cueOffset = { a: 0, b: 0 }; updateContactDot(); // efeito reseta a cada tacada
+  // Reconexões que chegaram durante a tacada: manda o estado já assentado.
+  if (pendingResyncs.length) { const q = pendingResyncs; pendingResyncs = []; for (const no of q) sendResync(no); }
   updateHUD();
   maybeBotTurn();
 }
@@ -571,10 +620,62 @@ function handleNet(msg) {
       if (currentTurn !== myNo) { const c = cue(); if (c) { c.x = msg.x; c.y = msg.y; c.potted = false; c._px = c.x; c._py = c.y; } }
       break;
     case 'peer_left':
-      if (!game.gameOver) setStatus((msg.no ? playerName(msg.no) : 'Adversário') + ' saiu da sala.');
+      if (!game.gameOver) setStatus((msg.no ? playerName(msg.no) : 'Adversário') + ' saiu — ele pode voltar entrando com o código da sala.');
+      break;
+    case 'rejoined': { // alguém RECONECTOU numa partida em andamento
+      if (phase === 'lobby') break;
+      if (msg.name && players[msg.no]) players[msg.no].name = msg.name;
+      setStatus(playerName(msg.no) + ' voltou à mesa!');
+      // O menor nº presente (excluindo quem voltou) é o responsável pelo snapshot.
+      const senders = TURN_ORDER.filter((n) => n !== msg.no);
+      if (myNo === Math.min(...senders)) queueResync(msg.no);
+      break;
+    }
+    case 'resync': // snapshot da partida (só para quem acabou de reconectar)
+      if (msg.for === myNo && phase === 'lobby') applyResync(msg);
       break;
     case 'rematch': doRematch(false); break;
   }
+}
+
+// ===========================================================================
+// Reconexão: snapshot completo do estado para quem voltou pelo código da sala
+// ===========================================================================
+let pendingResyncs = [];
+function queueResync(no) {
+  if (phase === 'sim') { if (!pendingResyncs.includes(no)) pendingResyncs.push(no); return; }
+  sendResync(no);
+}
+function sendResync(no) {
+  send({
+    t: 'resync', for: no,
+    players, order: TURN_ORDER, slots: roomSlots,
+    game: { open: game.open, groups: game.groups, gameOver: game.gameOver, winner: game.winner },
+    matchScore, matchOver, currentTurn, ballInHand,
+    balls: balls.map((b) => ({ n: b.n, x: b.x, y: b.y, potted: b.potted })),
+  });
+}
+function applyResync(msg) {
+  players = msg.players || players;
+  TURN_ORDER = (msg.order || [1, 2]).slice();
+  roomSlots = msg.slots || 2;
+  game.open = msg.game.open; game.groups = msg.game.groups;
+  game.gameOver = msg.game.gameOver; game.winner = msg.game.winner; game.lastMsg = '';
+  matchScore = msg.matchScore || { 1: 0, 2: 0 }; matchOver = !!msg.matchOver;
+  currentTurn = msg.currentTurn; ballInHand = !!msg.ballInHand;
+  document.getElementById('lobby').classList.add('hidden');
+  const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
+  document.getElementById('endOverlay').classList.add('hidden');
+  makeBalls();
+  for (const sb of (msg.balls || [])) {
+    const b = balls.find((x) => x.n === sb.n);
+    if (b) { b.x = sb.x; b.y = sb.y; b.potted = sb.potted; b._px = sb.x; b._py = sb.y; b.vx = b.vy = b.wx = b.wy = b.wz = 0; }
+  }
+  currentShot = null; shotQueue = []; cueOffset = { a: 0, b: 0 }; updateContactDot(); setAim(0);
+  phase = currentTurn === myNo ? 'aim' : 'wait';
+  if (window.OrbitAudio) OrbitAudio.startMusic();
+  updateHUD();
+  setStatus('Reconectado! A partida continua. 🎱');
 }
 
 // Aplica a mensagem 'start' (1v1 legado ou 2v2 com times) e começa o jogo.
@@ -761,10 +862,20 @@ function onMouseMove(e) {
     // p/ baixo = rente à mesa). Só câmera — a tacada não muda.
     const sensY = PITCH_SENS * (window.OrbitSettings && OrbitSettings.sensitivityY ? OrbitSettings.sensitivityY() : 1);
     camPitch = Math.max(0, Math.min(1, camPitch - my * sensY));
+    saveViewPrefs();
     sendAim();
   }
 }
 function onMouseUp() {}
+// Salva as preferências de câmera (altura/zoom) com debounce.
+let viewSaveTimer = null;
+function saveViewPrefs() {
+  clearTimeout(viewSaveTimer);
+  viewSaveTimer = setTimeout(() => {
+    try { localStorage.setItem('orbitpool.view', JSON.stringify({ pitch: camPitch, zoom })); } catch (e) {}
+  }, 500);
+}
+
 // Toast transitório da música no turnHint (restaura o HUD depois).
 let musicToastTimer = null;
 function musicToast(text) {
@@ -1064,6 +1175,7 @@ function getNameOrWarn() {
     const el = document.getElementById('name'); el.classList.add('err'); el.focus();
     return null;
   }
+  try { localStorage.setItem('orbitpool.name', v); } catch (e) {} // lembra o apelido
   return v;
 }
 function startSolo(level) {
@@ -1227,6 +1339,7 @@ function loadEquirectEnv() {
 
 function init() {
   if (!initRenderer()) return; // sem WebGL: mostra aviso e não tenta montar a cena 3D
+  maybeWarnSoftwareGL(); // WebGL por software = aceleração desativada → recomenda ativar
   // Usa o colisor extraído do modelo (contorno real das tabelas), se disponível.
   if (window.TABLE3D_COLLIDER && Physics.setTable) {
     const ok = Physics.setTable(window.TABLE3D_COLLIDER);
@@ -1245,13 +1358,24 @@ function init() {
   document.addEventListener('pointerlockchange', onLockChange);
   window.addEventListener('blur', cancelCharge); // cancela a carga se perder o foco
   canvas.addEventListener('contextmenu', (e) => e.preventDefault());
-  canvas.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.6, Math.min(1.8, zoom + e.deltaY * 0.0012)); }, { passive: false });
+  canvas.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.6, Math.min(1.8, zoom + e.deltaY * 0.0012)); saveViewPrefs(); }, { passive: false });
   canvas.addEventListener('touchstart', (e) => { e.preventDefault(); onTouchStart(e); }, { passive: false });
   canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onTouchMove(e); }, { passive: false });
   canvas.addEventListener('touchend', (e) => { e.preventDefault(); onTouchEnd(e); }, { passive: false });
 
   const lockInputs = () => { ['createBtn', 'createBtn2', 'joinBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = true; }); };
   document.getElementById('name').addEventListener('input', () => { document.getElementById('name').classList.remove('err'); setLobbyMsg(''); });
+
+  // ---- Preferências persistidas no navegador (voltam na próxima visita) ----
+  // Apelido: sempre vem carregado o último usado (editável normalmente).
+  // Câmera: altura (camPitch) e zoom preferidos.
+  try {
+    const savedName = localStorage.getItem('orbitpool.name');
+    if (savedName) document.getElementById('name').value = savedName;
+    const view = JSON.parse(localStorage.getItem('orbitpool.view') || '{}');
+    if (typeof view.pitch === 'number') camPitch = Math.max(0, Math.min(1, view.pitch));
+    if (typeof view.zoom === 'number') zoom = Math.max(0.6, Math.min(1.8, view.zoom));
+  } catch (e) {}
 
   if (window.OrbitMenu) {
     OrbitMenu.init({
