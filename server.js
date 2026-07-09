@@ -25,6 +25,7 @@ const MIME = {
   '.wav': 'audio/wav',
   '.ogg': 'audio/ogg',
   '.obj': 'text/plain; charset=utf-8',
+  '.glb': 'model/gltf-binary',
 };
 
 // ---------------------------------------------------------------------------

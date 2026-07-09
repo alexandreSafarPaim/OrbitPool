@@ -36,29 +36,35 @@ window.OrbitMenu = (function () {
   let open = false;
 
   const CSS = `
-  #obm-root{position:fixed;inset:0;z-index:60;display:none;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;}
+  #obm-root{position:fixed;inset:0;z-index:60;display:none;font-family:'Kalam',cursive;}
   #obm-root.show{display:block;}
   .obm-ovl{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-    background:rgba(6,10,16,.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+    background:rgba(6,10,8,.62);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
   .obm-ovl.show{display:flex;}
-  .obm-card{background:#111823;border:1px solid #2a3646;border-radius:18px;padding:26px 24px;
-    width:min(92vw,360px);box-shadow:0 24px 70px rgba(0,0,0,.55);color:#e8eef5;text-align:center;}
-  .obm-card h2{margin:0 0 4px;font-size:22px;font-weight:800;}
-  .obm-card h2 span{color:#37b26b;}
-  .obm-sub{color:#8fa1b5;font-size:13px;margin:0 0 18px;}
+  .obm-card{position:relative;padding:26px 24px;width:min(92vw,360px);text-align:center;color:#f3ecdb;
+    border-radius:14px;border:9px solid transparent;
+    background:radial-gradient(120% 90% at 30% 10%, #2f3b34, #1c241f 80%) padding-box,
+      linear-gradient(135deg,#7a4a1e,#5a3413) border-box;
+    box-shadow:0 24px 70px rgba(0,0,0,.55), inset 0 0 40px rgba(0,0,0,.6);}
+  .obm-card h2{margin:0 0 4px;font-family:'Pacifico',cursive;font-weight:400;font-size:24px;color:#fff;
+    text-shadow:0 1px 0 rgba(0,0,0,.4);}
+  .obm-card h2 span{color:#ffd24a;}
+  .obm-sub{color:#cbb892;font-size:14px;margin:0 0 18px;}
   .obm-btn{display:block;width:100%;margin:10px 0 0;padding:13px;border:0;border-radius:11px;
-    font-size:15px;font-weight:700;cursor:pointer;background:#2f9e5a;color:#fff;transition:transform .08s,background .15s;}
-  .obm-btn:hover{background:#37b26b;}
-  .obm-btn:active{transform:scale(.98);}
-  .obm-btn.ghost{background:transparent;color:#cfe1f0;border:1px solid #2a3646;}
-  .obm-btn.ghost:hover{background:rgba(255,255,255,.05);}
-  .obm-btn.danger{background:transparent;color:#ff7a7a;border:1px solid rgba(255,122,122,.5);}
-  .obm-btn.danger:hover{background:rgba(255,122,122,.1);}
+    font-family:'Permanent Marker',cursive;font-size:16px;cursor:pointer;color:#3a1e05;
+    background:linear-gradient(180deg,#ffd24a,#e69a1a);
+    box-shadow:0 5px 0 #a86a10, 0 8px 18px rgba(0,0,0,.35);transition:transform .08s,box-shadow .15s;}
+  .obm-btn:hover{transform:translateY(1px);box-shadow:0 4px 0 #a86a10, 0 6px 14px rgba(0,0,0,.35);}
+  .obm-btn:active{transform:translateY(2px);}
+  .obm-btn.ghost{background:rgba(255,210,74,.08);color:#ffd24a;border:1.5px dashed rgba(255,210,74,.5);box-shadow:none;}
+  .obm-btn.ghost:hover{background:rgba(255,210,74,.16);transform:none;}
+  .obm-btn.danger{background:transparent;color:#ff8a76;border:1.5px dashed rgba(255,122,102,.55);box-shadow:none;}
+  .obm-btn.danger:hover{background:rgba(255,122,102,.12);transform:none;}
   .obm-row{text-align:left;margin:16px 0;}
-  .obm-row label{display:flex;justify-content:space-between;font-size:13px;color:#9fb0c3;margin-bottom:7px;}
-  .obm-row label b{color:#e8eef5;font-weight:700;}
-  .obm-row input[type=range]{width:100%;accent-color:#37b26b;height:22px;cursor:pointer;}
-  .obm-hint{color:#66727f;font-size:11px;margin-top:6px;line-height:1.5;}
+  .obm-row label{display:flex;justify-content:space-between;font-size:14px;color:#cbb892;margin-bottom:7px;}
+  .obm-row label b{color:#f3ecdb;font-weight:700;font-family:'Oswald',sans-serif;}
+  .obm-row input[type=range]{width:100%;accent-color:#ffd24a;height:22px;cursor:pointer;}
+  .obm-hint{color:#9c8f74;font-size:11px;margin-top:6px;line-height:1.5;}
   .obm-only3d{display:none;}
   #obm-root.is3d .obm-only3d{display:block;}
   `;
