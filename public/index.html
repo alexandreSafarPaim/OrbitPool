@@ -300,9 +300,14 @@
     /* campo de nome obrigatório em destaque quando vazio */
     .lbCard input.err { border-color: #ff6b6b; box-shadow: 0 0 0 3px rgba(255,107,107,.18); }
     .lbCard input.err::placeholder { color: #ff9d9d; }
-    .createRow { display: flex; gap: 8px; }
-    .createRow .btnPrimary { flex: 1; }
-    .btn2v2 { background: linear-gradient(180deg, #7c5cff, #5b3fd6); }
+    .createRow { display: flex; gap: 10px; }
+    .createRow .btnPrimary { flex: 1; margin-top: 8px; }
+    .btnMode { display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3px; padding: 11px 8px; line-height: 1.15; }
+    .bmTitle { font-size: 16px; font-weight: 800; letter-spacing: .2px; }
+    .bmSub { font-size: 11px; font-weight: 700; opacity: .78; }
+    .btn2v2 { background: linear-gradient(180deg, #8a6bff, #5b3fd6); color: #fff;
+      box-shadow: 0 8px 22px rgba(107,79,230,.35); }
     .btn2v2:hover { filter: brightness(1.1); }
     .tlPanel { min-width: 340px; max-width: 440px; }
     #tlList { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
@@ -453,9 +458,16 @@
         <p class="cardSub">Escolha seu nome e comece uma partida.</p>
         <label class="fieldLbl" for="name">Seu nome</label>
         <div class="inputWrap"><span class="idot"></span><input id="name" maxlength="20" placeholder="Ex: Alex" /></div>
+        <label class="fieldLbl" style="margin-top:14px">Criar nova sala</label>
         <div class="createRow">
-          <button id="createBtn" class="btnPrimary">Criar sala 1v1 →</button>
-          <button id="createBtn2" class="btnPrimary btn2v2">Criar sala 2v2 (duplas) →</button>
+          <button id="createBtn" class="btnPrimary btnMode">
+            <span class="bmTitle">🎱 1v1</span>
+            <span class="bmSub">partida clássica</span>
+          </button>
+          <button id="createBtn2" class="btnPrimary btnMode btn2v2">
+            <span class="bmTitle">🤝 2v2</span>
+            <span class="bmSub">duplas · 4 jogadores</span>
+          </button>
         </div>
 
         <div class="orSep"><span>ou entre com um código</span></div>
