@@ -436,7 +436,10 @@ const Physics = (function () {
     // μbb decai com a velocidade de impacto (aprox. dados do Dr. Dave, §6.2).
     const muDyn = Math.min(0.08, MU_BALL_BALL * Math.exp(-0.7 * Math.abs(p) * WORLD_TO_MPS) + 0.01);
     const jMax = muDyn * Math.abs(p);
-    const jStop = vRelMag * 0.5; // fator efetivo simplificado (massas iguais)
+    // Impulso que ZERA o slip de contato (gearing): cada unidade de jt reduz o
+    // slip em 7·jt para massas iguais (2·jt linear + 5·jt via Δωz=5jt/2R nas
+    // duas bolas). Mais que isso inverteria o slip — atrito não faz isso.
+    const jStop = vRelMag / 7;
     const jt = Math.sign(vRelContact) * Math.min(jMax, jStop);
 
     a.vx += nx * p - tx * jt; a.vy += ny * p - ty * jt;
@@ -463,7 +466,10 @@ const Physics = (function () {
     const e = Math.min(0.90, Math.max(0.65, REST_RAIL_BASE - REST_RAIL_VEL_DROP * vnMps));
 
     const vnOut = -e * vn;
-    const vtOut = vt * CUSHION_TANGENT_FACTOR - CUSHION_SPIN_SHIFT * R * b.wz;
+    // Contato no lado da almofada (−R·n̂): slip do inglês = −R·ωz·t̂; o atrito
+    // se opõe ao slip ⇒ Δvt = +f_spin·R·ωz (running english alarga o rebote,
+    // check side encurta — consistente com o throw bola-bola e docs §7.1).
+    const vtOut = vt * CUSHION_TANGENT_FACTOR + CUSHION_SPIN_SHIFT * R * b.wz;
 
     b.vx = vnOut * nx + vtOut * tx;
     b.vy = vnOut * ny + vtOut * ty;

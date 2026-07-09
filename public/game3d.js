@@ -357,7 +357,11 @@ function evaluateShot(ev) {
     if (game.open) { if (fc === 'eight') { foul = true; reasons.push('acertou a 8 primeiro com a mesa aberta'); } }
     else {
       const myGrp = game.groups[shooter];
-      const cleared = remainingOfGroup(myGrp) === 0;
+      // Estado ANTES da tacada: endShot já marcou como potted as bolas desta
+      // tacada, então soma de volta as do grupo encaçapadas agora. Sem isso,
+      // matar a última bola do grupo virava falta ("devia acertar a 8").
+      const pottedMineNow = ev.potted.filter((n) => groupName(n) === myGrp).length;
+      const cleared = remainingOfGroup(myGrp) + pottedMineNow === 0;
       if (cleared) { if (fc !== 'eight') { foul = true; reasons.push('devia acertar a 8 primeiro'); } }
       else if (fc !== myGrp) { foul = true; reasons.push('acertou a bola do adversário primeiro'); }
     }
@@ -366,8 +370,11 @@ function evaluateShot(ev) {
   const eightPotted = ev.potted.includes(8);
   if (eightPotted) {
     const myGrp = game.groups[shooter];
-    const clearedNow = myGrp && remainingOfGroup(myGrp) === 0;
-    const legal = !foul && !ev.cuePotted && !game.open && clearedNow;
+    // Só é legal se o grupo já estava limpo ANTES desta tacada (WPA: encaçapar
+    // a última bola do grupo e a 8 no mesmo golpe é derrota).
+    const pottedMineNow = ev.potted.filter((n) => groupName(n) === myGrp).length;
+    const clearedBefore = myGrp && remainingOfGroup(myGrp) + pottedMineNow === 0;
+    const legal = !foul && !ev.cuePotted && !game.open && clearedBefore;
     game.gameOver = true; game.winner = legal ? shooter : opp;
     game.lastMsg = legal ? `Bola 8 encaçapada! ${playerName(shooter)} venceu! 🏆`
       : `${playerName(shooter)} encaçapou a 8 fora de hora. ${playerName(opp)} venceu!`;
@@ -636,8 +643,10 @@ function sendCue(force) {
 
 function shoot(power) {
   const c = cue();
-  const dir = Physics.squirtedDir(aimDir, cueOffset.a);
-  let strike = Physics.cueStrike(power, dir, cueOffset.a, cueOffset.b);
+  // cueStrike já aplica o squirt internamente — passar aimDir puro (aplicar
+  // squirtedDir aqui dobraria a deflexão e descasaria da linha de mira).
+  const dir = Physics.squirtedDir(aimDir, cueOffset.a); // só p/ fallback de miscue
+  let strike = Physics.cueStrike(power, aimDir, cueOffset.a, cueOffset.b);
   if (strike.miscue) { strike = { vx: dir.x * power * MAX_SHOT * 0.15, vy: dir.y * power * MAX_SHOT * 0.15, wx: 0, wy: 0, wz: 0 }; game.lastMsg = 'Miscue! Tacada fraca.'; }
   c.vx = strike.vx; c.vy = strike.vy; c.wx = strike.wx; c.wy = strike.wy; c.wz = strike.wz;
   cueOffset = { a: 0, b: 0 }; endContact(); updateContactDot(); // efeito reseta ao centro após a tacada
