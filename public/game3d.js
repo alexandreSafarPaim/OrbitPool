@@ -20,6 +20,21 @@ const MAXDRAG_PX = 190;   // arraste (px de tela) para potência máxima
 let balls = [];
 let myNo = 0, oppName = 'Adversário', myName = 'Você';
 let currentTurn = 1;
+// ---- Salas 1v1 e 2v2 (duplas) ---------------------------------------------
+// players: playerNo → { name, team (1|2) }. TURN_ORDER: rotação fixa de
+// tacadas — 1v1: [1,2]; 2v2: [A1, B1, A2, B2] (padrão scotch doubles: alterna
+// time E parceiro; quem encaçapa legal continua na vez).
+let roomSlots = 2;                 // 2 = 1v1, 4 = 2v2
+let players = { 1: { name: 'Você', team: 1 }, 2: { name: 'Adversário', team: 2 } };
+let TURN_ORDER = [1, 2];
+let iAmHost = false;
+let lobbyRoster = [];              // lista do lobby 2v2: [{no,name}]
+let teamSel = {};                  // escolha de times do host: no → 1|2
+const teamOf = (no) => (players[no] ? players[no].team : (no === 1 ? 1 : 2));
+const nextTurnAfter = (no) => {
+  const i = TURN_ORDER.indexOf(no);
+  return TURN_ORDER[(i + 1) % TURN_ORDER.length];
+};
 // Modo treino (single-player): botLevel != null → o adversário é a IA (jogador 2).
 let botLevel = null; const BOT_NO = 2; let botTimer = null;
 const BOT_NAMES = { iniciante: 'Bot Iniciante', amador: 'Bot Amador', pro: 'Bot Pro', mineirinho: 'Mineirinho de Araxá' };
@@ -354,10 +369,20 @@ function deriveRuleEvents(events) {
   return { firstContact, cuePotted, potted, pottedOrder };
 }
 function remainingOfGroup(grp) { return balls.filter((b) => !b.potted && groupName(b.n) === grp).length; }
-function playerName(no) { return no === myNo ? myName : oppName; }
+function playerName(no) { return (players[no] && players[no].name) || (no === myNo ? myName : oppName) || ('Jogador ' + no); }
+// Nome do time (2v2: "Alex & Bia"; 1v1: nome do jogador).
+function teamLabel(team) {
+  const names = TURN_ORDER.filter((no) => teamOf(no) === team).map(playerName);
+  return names.join(' & ') || ('Time ' + team);
+}
 
+// Regras do 8-ball. GRUPOS, VITÓRIA e FALTAS são por TIME (game.groups é
+// indexado pelo time 1|2). No 1v1 time == playerNo, então nada muda. A vez
+// passa seguindo TURN_ORDER (2v2: alterna time e parceiro — scotch doubles).
 function evaluateShot(ev) {
-  const shooter = currentTurn, opp = shooter === 1 ? 2 : 1;
+  const shooter = currentTurn;
+  const myTeam = teamOf(shooter), oppTeam = myTeam === 1 ? 2 : 1;
+  const nextNo = nextTurnAfter(shooter); // quem joga se a vez passar
   let foul = false; const reasons = [];
   if (ev.firstContact === null) { foul = true; reasons.push('a branca não tocou em nenhuma bola'); }
   if (ev.cuePotted) { foul = true; reasons.push('a branca caiu (scratch)'); }
@@ -365,7 +390,7 @@ function evaluateShot(ev) {
     const fc = groupName(ev.firstContact);
     if (game.open) { if (fc === 'eight') { foul = true; reasons.push('acertou a 8 primeiro com a mesa aberta'); } }
     else {
-      const myGrp = game.groups[shooter];
+      const myGrp = game.groups[myTeam];
       // Estado ANTES da tacada: endShot já marcou como potted as bolas desta
       // tacada, então soma de volta as do grupo encaçapadas agora. Sem isso,
       // matar a última bola do grupo virava falta ("devia acertar a 8").
@@ -378,34 +403,34 @@ function evaluateShot(ev) {
   const numbered = ev.potted.filter((n) => n !== 8);
   const eightPotted = ev.potted.includes(8);
   if (eightPotted) {
-    const myGrp = game.groups[shooter];
+    const myGrp = game.groups[myTeam];
     // Só é legal se o grupo já estava limpo ANTES desta tacada (WPA: encaçapar
     // a última bola do grupo e a 8 no mesmo golpe é derrota).
     const pottedMineNow = ev.potted.filter((n) => groupName(n) === myGrp).length;
     const clearedBefore = myGrp && remainingOfGroup(myGrp) + pottedMineNow === 0;
     const legal = !foul && !ev.cuePotted && !game.open && clearedBefore;
-    game.gameOver = true; game.winner = legal ? shooter : opp;
-    game.lastMsg = legal ? `Bola 8 encaçapada! ${playerName(shooter)} venceu! 🏆`
-      : `${playerName(shooter)} encaçapou a 8 fora de hora. ${playerName(opp)} venceu!`;
-    return { nextTurn: game.winner, ballInHand: false, foul };
+    game.gameOver = true; game.winner = legal ? myTeam : oppTeam; // vencedor = TIME
+    game.lastMsg = legal ? `Bola 8 encaçapada! ${teamLabel(myTeam)} venceu! 🏆`
+      : `${playerName(shooter)} encaçapou a 8 fora de hora. ${teamLabel(oppTeam)} venceu!`;
+    return { nextTurn: shooter, ballInHand: false, foul };
   }
   let continueTurn = false;
   if (!foul && game.open && numbered.length) {
     const first = ev.pottedOrder.find((n) => n !== 8); const grp = groupName(first);
     if (grp === 'solid' || grp === 'stripe') {
-      game.groups[shooter] = grp; game.groups[opp] = grp === 'solid' ? 'stripe' : 'solid';
+      game.groups[myTeam] = grp; game.groups[oppTeam] = grp === 'solid' ? 'stripe' : 'solid';
       game.open = false; continueTurn = true;
-      game.lastMsg = `${playerName(shooter)} ficou com as ${grp === 'solid' ? 'lisas' : 'listradas'}.`;
+      game.lastMsg = `${teamLabel(myTeam)} ficou com as ${grp === 'solid' ? 'lisas' : 'listradas'}.`;
     }
   } else if (!foul && !game.open && numbered.length) {
-    const myGrp = game.groups[shooter];
+    const myGrp = game.groups[myTeam];
     if (numbered.some((n) => groupName(n) === myGrp)) { continueTurn = true; game.lastMsg = `${playerName(shooter)} encaçapou e continua.`; }
     else game.lastMsg = `${playerName(shooter)} encaçapou bola do adversário. Passa a vez.`;
   }
   let nextTurn, bih = false;
-  if (foul) { nextTurn = opp; bih = true; game.lastMsg = `Falta: ${reasons[0]}. ${playerName(opp)} joga com a bola na mão.`; }
+  if (foul) { nextTurn = nextNo; bih = true; game.lastMsg = `Falta: ${reasons[0]}. ${playerName(nextNo)} joga com a bola na mão.`; }
   else if (continueTurn) nextTurn = shooter;
-  else { nextTurn = opp; if (!game.lastMsg) game.lastMsg = `Vez de ${playerName(opp)}.`; }
+  else { nextTurn = nextNo; if (!game.lastMsg) game.lastMsg = `Vez de ${playerName(nextNo)}.`; }
   return { nextTurn, ballInHand: bih, foul };
 }
 
@@ -455,29 +480,139 @@ function endShot() {
 // ===========================================================================
 // Rede (mesmo protocolo do 2D)
 // ===========================================================================
-function hostRoom() { OrbitNet.hostRoom(roomInput, myName, handleNet); } // cria sala (host)
-function joinRoom() { OrbitNet.joinRoom(roomInput, myName, handleNet); } // entra pelo código
+function hostRoom(slots) { OrbitNet.hostRoom(roomInput, myName, handleNet, slots); } // cria sala (host)
+function joinRoom() { OrbitNet.joinRoom(roomInput, myName, handleNet); }              // entra pelo código
 function send(o) { OrbitNet.send(o); }
 
 function handleNet(msg) {
   switch (msg.t) {
     case '_neterror': setLobbyMsg(msg.msg || 'Erro de rede.'); break;
-    case 'joined': myNo = msg.playerNo; setLobbyMsg(`Entrou como Jogador ${myNo}. ${myNo === 1 ? 'Aguardando adversário...' : ''}`); break;
-    case 'waiting': setLobbyMsg('Aguardando o segundo jogador entrar na sala...'); break;
-    case 'full': setLobbyMsg('Sala cheia! Tente outro nome de sala.'); break;
-    case 'start': oppName = msg.opponent || 'Adversário'; currentTurn = msg.startTurn; startGame(); break;
+    case 'joined': // servidor (?server) ou host P2P local
+      myNo = msg.playerNo; if (msg.slots) roomSlots = msg.slots;
+      setLobbyMsg(`Entrou como Jogador ${myNo}.` + (myNo === 1 ? ' Aguardando os outros jogadores...' : ''));
+      break;
+    case 'assign': // host P2P atribuiu seu número/vagas da sala
+      myNo = msg.playerNo; roomSlots = msg.slots || 2;
+      setLobbyMsg(`Entrou na sala como Jogador ${myNo}.`);
+      break;
+    case 'waiting': setLobbyMsg(roomSlots === 4 ? 'Aguardando os 4 jogadores entrarem na sala...' : 'Aguardando o segundo jogador entrar na sala...'); break;
+    case 'full': setLobbyMsg('Sala cheia (ou partida já começou)! Tente outra sala.'); break;
+    case 'lobby': // roster do 2v2 mudou (entrou/saiu alguém)
+      lobbyRoster = msg.players || []; roomSlots = msg.slots || roomSlots;
+      renderTeamLobby();
+      break;
+    case 'teams': // host mexeu nos times — convidados veem ao vivo
+      teamSel = msg.sel || {};
+      renderTeamLobby();
+      break;
+    case 'start': applyStart(msg); break;
     case 'shot': {
       const shot = { duration: msg.duration, segments: msg.segments, events: msg.events, cueSpeed: msg.cueSpeed, finalBalls: msg.finalBalls };
       if (phase === 'sim' && currentShot) shotQueue.push(shot); else startPlayback(shot);
       break;
     }
     case 'aim': oppAim = msg.a; break;
-    case 'ballcue': // adversário reposicionando a branca — reflete em tempo real
+    case 'ballcue': // outro jogador reposicionando a branca — reflete em tempo real
       if (currentTurn !== myNo) { const c = cue(); if (c) { c.x = msg.x; c.y = msg.y; c.potted = false; c._px = c.x; c._py = c.y; } }
       break;
-    case 'peer_left': if (!game.gameOver) setStatus('Adversário saiu da sala.'); break;
+    case 'peer_left':
+      if (!game.gameOver) setStatus((msg.no ? playerName(msg.no) : 'Adversário') + ' saiu da sala.');
+      break;
     case 'rematch': doRematch(false); break;
   }
+}
+
+// Aplica a mensagem 'start' (1v1 legado ou 2v2 com times) e começa o jogo.
+function applyStart(msg) {
+  if (msg.players && msg.order) { // 2v2: host montou os times
+    players = msg.players; TURN_ORDER = msg.order.slice(); roomSlots = 4;
+  } else { // 1v1: monta o roster local a partir do nome do adversário
+    const oppNo = myNo === 1 ? 2 : 1;
+    oppName = msg.opponent || 'Adversário';
+    players = {};
+    players[myNo] = { name: myName, team: myNo };
+    players[oppNo] = { name: oppName, team: oppNo };
+    TURN_ORDER = [1, 2]; roomSlots = 2;
+  }
+  const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
+  currentTurn = msg.startTurn || TURN_ORDER[0];
+  matchScore = { 1: 0, 2: 0 }; matchOver = false;
+  startGame();
+}
+
+// ===========================================================================
+// Lobby de times (2v2): o host distribui os 4 jogadores em 2 duplas
+// ===========================================================================
+function renderTeamLobby() {
+  const ov = document.getElementById('teamLobby');
+  if (!ov || roomSlots !== 4 || phase !== 'lobby') return;
+  ov.classList.remove('hidden');
+  document.getElementById('tlCode').textContent = roomInput;
+
+  // Times padrão por ordem de entrada (ímpares=A, pares=B); host pode mudar.
+  for (const p of lobbyRoster) if (!teamSel[p.no]) teamSel[p.no] = (p.no % 2 === 1) ? 1 : 2;
+  for (const k of Object.keys(teamSel)) if (!lobbyRoster.some((p) => p.no === +k)) delete teamSel[k];
+
+  const list = document.getElementById('tlList'); list.innerHTML = '';
+  for (const p of lobbyRoster) {
+    const row = document.createElement('div'); row.className = 'tlRow';
+    const nm = document.createElement('span'); nm.className = 'tlName';
+    nm.textContent = p.name + (p.no === myNo ? ' (você)' : '') + (p.no === 1 ? ' 👑' : '');
+    row.appendChild(nm);
+    for (const t of [1, 2]) {
+      const b = document.createElement('button');
+      b.className = 'tlTeam t' + t + (teamSel[p.no] === t ? ' sel' : '');
+      b.textContent = t === 1 ? 'Time A' : 'Time B';
+      if (iAmHost) {
+        b.addEventListener('click', () => {
+          teamSel[p.no] = t;
+          send({ t: 'teams', sel: teamSel });
+          renderTeamLobby();
+        });
+      } else b.disabled = true;
+      row.appendChild(b);
+    }
+    list.appendChild(row);
+  }
+  for (let i = lobbyRoster.length; i < 4; i++) {
+    const row = document.createElement('div'); row.className = 'tlRow empty';
+    row.innerHTML = '<span class="tlName">Aguardando jogador…</span>';
+    list.appendChild(row);
+  }
+
+  const nA = lobbyRoster.filter((p) => teamSel[p.no] === 1).length;
+  const full = lobbyRoster.length === 4, balanced = nA === 2;
+  document.getElementById('tlRandom').style.display = iAmHost ? '' : 'none';
+  const st = document.getElementById('tlStart');
+  st.style.display = iAmHost ? '' : 'none';
+  st.disabled = !(full && balanced);
+  document.getElementById('tlMsg').textContent = !full
+    ? `Aguardando jogadores (${lobbyRoster.length}/4)… Código da sala: ${roomInput}`
+    : (!balanced ? 'Os times precisam ter 2 jogadores cada.'
+      : (iAmHost ? 'Tudo pronto! Pode começar.' : 'Aguardando o host começar a partida…'));
+}
+
+// Host: sorteia as duplas (2x2 aleatório).
+function randomTeams() {
+  const nos = lobbyRoster.map((p) => p.no);
+  for (let i = nos.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [nos[i], nos[j]] = [nos[j], nos[i]]; }
+  nos.forEach((no, i) => { teamSel[no] = i < Math.ceil(nos.length / 2) ? 1 : 2; });
+  send({ t: 'teams', sel: teamSel });
+  renderTeamLobby();
+}
+
+// Host: valida, monta a rotação A1→B1→A2→B2 e dá o start para todos.
+function hostStart2v2() {
+  const nosA = lobbyRoster.filter((p) => teamSel[p.no] === 1).map((p) => p.no).sort((a, b) => a - b);
+  const nosB = lobbyRoster.filter((p) => teamSel[p.no] === 2).map((p) => p.no).sort((a, b) => a - b);
+  if (lobbyRoster.length !== 4 || nosA.length !== 2 || nosB.length !== 2) return;
+  const order = [nosA[0], nosB[0], nosA[1], nosB[1]]; // alterna time e parceiro
+  const pl = {};
+  for (const p of lobbyRoster) pl[p.no] = { name: p.name, team: teamSel[p.no] };
+  const msg = { t: 'start', players: pl, order, startTurn: order[0], slots: 4 };
+  send(msg);
+  if (OrbitNet.markStarted) OrbitNet.markStarted();
+  applyStart(msg);
 }
 
 // ===========================================================================
@@ -565,21 +700,38 @@ function onMouseMove(e) {
     sendAim(); return;
   }
   if (amShooter() && phase === 'aim') {
-    const sens = AIM_SENS * (window.OrbitSettings ? OrbitSettings.sensitivity() : 1);
-    setAim(aimAngle + mx * sens);
+    const sensX = AIM_SENS * (window.OrbitSettings && OrbitSettings.sensitivityX ? OrbitSettings.sensitivityX() : 1);
+    setAim(aimAngle + mx * sensX);
     // Mouse Y: eleva/abaixa o ponto de vista (mouse p/ cima = ver de cima,
     // p/ baixo = rente à mesa). Só câmera — a tacada não muda.
-    camPitch = Math.max(0, Math.min(1, camPitch - my * PITCH_SENS));
+    const sensY = PITCH_SENS * (window.OrbitSettings && OrbitSettings.sensitivityY ? OrbitSettings.sensitivityY() : 1);
+    camPitch = Math.max(0, Math.min(1, camPitch - my * sensY));
     sendAim();
   }
 }
 function onMouseUp() {}
+// Toast transitório da música no turnHint (restaura o HUD depois).
+let musicToastTimer = null;
+function musicToast(text) {
+  setStatus(text);
+  clearTimeout(musicToastTimer);
+  musicToastTimer = setTimeout(() => { if (phase !== 'lobby') updateHUD(); }, 2500);
+}
 function onKeyDown(e) {
   if (window.OrbitMenu && OrbitMenu.isOpen()) return; // menu de pausa aberto
   if (e.key === 'Control' || e.ctrlKey) beginCharge();
   else if (e.key === 'Tab') { e.preventDefault(); topOverride = true; }
   else if (e.key === 'Shift') beginContact();
   else if (e.key === 'h' || e.key === 'H') toggleControls();
+  // ---- Música: N = próxima · B = anterior · M = pausar/tocar --------------
+  else if ((e.key === 'n' || e.key === 'N') && window.OrbitAudio && OrbitAudio.nextMusic) {
+    const i = OrbitAudio.nextMusic(); if (i) musicToast('♪ ' + i.title);
+  } else if ((e.key === 'b' || e.key === 'B') && window.OrbitAudio && OrbitAudio.prevMusic) {
+    const i = OrbitAudio.prevMusic(); if (i) musicToast('♪ ' + i.title);
+  } else if ((e.key === 'm' || e.key === 'M') && window.OrbitAudio && OrbitAudio.toggleMusic) {
+    const i = OrbitAudio.toggleMusic();
+    if (i) musicToast(i.playing ? ('▶ ' + i.title) : '⏸ música pausada');
+  }
 }
 function onKeyUp(e) {
   if (e.key === 'Control') endCharge();
@@ -741,10 +893,10 @@ function buildChips(el, grp) {
     el.appendChild(c);
   }
 }
-// Barras da série no centro: vitórias do oponente (azul) + suas (verde) + resto.
-function buildDashes(oppNo) {
+// Barras da série no centro: vitórias do time oponente (azul) + do seu (verde).
+function buildDashes(oppTeam, myTeam) {
   const el = document.getElementById('dashes'); el.innerHTML = '';
-  const ow = matchScore[oppNo] || 0, mw = matchScore[myNo] || 0;
+  const ow = matchScore[oppTeam] || 0, mw = matchScore[myTeam] || 0;
   for (let i = 0; i < SERIES_GAMES; i++) {
     const d = document.createElement('i');
     if (i < ow) d.style.background = '#3b82f6';
@@ -754,44 +906,49 @@ function buildDashes(oppNo) {
 }
 // Texto curto do banner (estado da vez / ação).
 function bannerText() {
-  if (game.gameOver) return game.winner === myNo ? 'VOCÊ VENCEU' : 'FIM DE JOGO';
+  if (game.gameOver) {
+    return game.winner === teamOf(myNo)
+      ? (roomSlots === 4 ? 'SEU TIME VENCEU' : 'VOCÊ VENCEU')
+      : 'FIM DE JOGO';
+  }
   if (currentTurn === myNo) {
     if (ballInHand) return 'BOLA NA MÃO';
     if (!isLocked()) return 'CLIQUE PARA MIRAR';
     return 'SUA VEZ';
   }
-  return 'VEZ DE ' + (oppName || 'ADVERSÁRIO').toUpperCase();
+  const nm = playerName(currentTurn).toUpperCase();
+  return 'VEZ DE ' + nm + (roomSlots === 4 && teamOf(currentTurn) === teamOf(myNo) ? ' (SUA DUPLA)' : '');
 }
 
 function updateHUD() {
-  const oppNo = myNo === 1 ? 2 : 1;
-  const meName = myName || ('Jogador ' + myNo);
-  const opName = oppName || ('Jogador ' + oppNo);
-  // Esquerda = oponente, direita = você (como no design).
+  const myTeam = teamOf(myNo), oppTeam = myTeam === 1 ? 2 : 1;
+  const meName = teamLabel(myTeam) || myName;
+  const opName = teamLabel(oppTeam) || oppName;
+  // Esquerda = time oponente, direita = seu time (1v1: cada lado é 1 jogador).
   document.getElementById('nmL').textContent = opName;
   document.getElementById('nmR').textContent = meName;
   document.getElementById('avL').textContent = (opName.trim().charAt(0) || 'A').toUpperCase();
   document.getElementById('avR').textContent = (meName.trim().charAt(0) || 'V').toUpperCase();
-  const myTurn = currentTurn === myNo && !game.gameOver;
-  const opTurn = currentTurn === oppNo && !game.gameOver;
+  const myTurn = teamOf(currentTurn) === myTeam && !game.gameOver;
+  const opTurn = !myTurn && !game.gameOver;
   document.getElementById('plL').classList.toggle('turn', opTurn);
   document.getElementById('plR').classList.toggle('turn', myTurn);
   document.getElementById('dotL').classList.toggle('on', opTurn);
   document.getElementById('dotR').classList.toggle('on', myTurn);
 
-  for (const [side, pl] of [['L', oppNo], ['R', myNo]]) {
-    const g = game.groups[pl];
+  for (const [side, team] of [['L', oppTeam], ['R', myTeam]]) {
+    const g = game.groups[team];
     const rem = g ? remainingOfGroup(g) : 0;
     document.getElementById('grp' + side).textContent = !g ? 'mesa aberta' : (g === 'solid' ? ('lisas · ' + rem) : ('listradas · ' + rem));
     buildChips(document.getElementById('chips' + side), g);
   }
 
   document.getElementById('sbSeries').textContent = 'MELHOR DE ' + SERIES_GAMES;
-  document.getElementById('scoreL').textContent = matchScore[oppNo];
-  document.getElementById('scoreR').textContent = matchScore[myNo];
-  buildDashes(oppNo);
+  document.getElementById('scoreL').textContent = matchScore[oppTeam];
+  document.getElementById('scoreR').textContent = matchScore[myTeam];
+  buildDashes(oppTeam, myTeam);
 
-  document.getElementById('turnPill').classList.toggle('mine', myTurn);
+  document.getElementById('turnPill').classList.toggle('mine', currentTurn === myNo && !game.gameOver);
   document.getElementById('statusText').textContent = bannerText();
   setStatus(game.gameOver ? '' : (game.lastMsg || ''));
 }
@@ -814,18 +971,19 @@ function startGame() {
 }
 function showEnd() {
   exitLock(); // libera o cursor na hora (pra clicar no overlay de fim de jogo)
-  // Conta a vitória na série (determinístico → os dois lados incrementam igual).
+  // Conta a vitória na série (determinístico → todos os lados incrementam igual).
   matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
   matchOver = matchScore[game.winner] >= SERIES_TARGET;
-  const won = game.winner === myNo;
+  const won = game.winner === teamOf(myNo); // vitória do SEU time (1v1: você)
+  const we = roomSlots === 4 ? 'Seu time' : 'Você';
   if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
   const t = document.getElementById('endTitle'), m = document.getElementById('endMsg'), btn = document.getElementById('rematchBtn');
   if (matchOver) {
-    t.textContent = won ? '🏆 Você venceu o melhor de 5!' : '😞 Você perdeu o melhor de 5';
+    t.textContent = won ? `🏆 ${we} venceu o melhor de 5!` : `😞 ${we} perdeu o melhor de 5`;
     m.textContent = `Placar final: ${matchScore[1]} – ${matchScore[2]}. ${game.lastMsg}`;
     btn.textContent = 'Nova série';
   } else {
-    t.textContent = won ? '🎉 Você venceu a partida!' : 'Você perdeu a partida';
+    t.textContent = won ? `🎉 ${we} venceu a partida!` : `${we} perdeu a partida`;
     m.textContent = `${game.lastMsg} Placar da série: ${matchScore[1]} – ${matchScore[2]}.`;
     btn.textContent = 'Próxima partida';
   }
@@ -836,7 +994,7 @@ function showEnd() {
 }
 function doRematch(initiator) {
   if (matchOver) { matchScore = { 1: 0, 2: 0 }; matchOver = false; } // fim da série → zera para a próxima
-  currentTurn = 1; if (!botLevel && initiator) send({ t: 'rematch' }); startGame();
+  currentTurn = TURN_ORDER[0]; if (!botLevel && initiator) send({ t: 'rematch' }); startGame();
 }
 
 // ===========================================================================
@@ -857,6 +1015,9 @@ function startSolo(level) {
   const nm = getNameOrWarn(); if (!nm) return;
   myName = nm;
   myNo = 1; botLevel = level; oppName = BOT_NAMES[level] || 'Bot';
+  roomSlots = 2; iAmHost = false;
+  players = { 1: { name: nm, team: 1 }, 2: { name: oppName, team: 2 } };
+  TURN_ORDER = [1, 2];
   matchScore = { 1: 0, 2: 0 }; matchOver = false;
   currentTurn = 1; // você quebra
   startGame();
@@ -959,7 +1120,9 @@ function loadCubeEnv(ext, onFail) {
       uniforms: { env: { value: tex } },
       vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
       // Saída direta (sRGB → sRGB): equivale ao toneMapped=false da panorâmica.
-      fragmentShader: 'uniform samplerCube env; varying vec3 vDir; void main(){ gl_FragColor = textureCube(env, normalize(vDir)); }',
+      // -vDir.x: cubemaps são definidos "vistos de FORA"; vistos de dentro é
+      // preciso espelhar o X (mesmo flipEnvMap=-1 que o three usa no skybox).
+      fragmentShader: 'uniform samplerCube env; varying vec3 vDir; void main(){ vec3 d = normalize(vDir); gl_FragColor = textureCube(env, vec3(-d.x, d.yz)); }',
       side: THREE.BackSide, depthWrite: false, fog: false,
     });
     bgSphere = new THREE.Mesh(geo, mat);
@@ -1029,7 +1192,7 @@ function init() {
   canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onTouchMove(e); }, { passive: false });
   canvas.addEventListener('touchend', (e) => { e.preventDefault(); onTouchEnd(e); }, { passive: false });
 
-  const lockInputs = () => { ['createBtn', 'joinBtn'].forEach((id) => { document.getElementById(id).disabled = true; }); };
+  const lockInputs = () => { ['createBtn', 'createBtn2', 'joinBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = true; }); };
   document.getElementById('name').addEventListener('input', () => { document.getElementById('name').classList.remove('err'); setLobbyMsg(''); });
 
   if (window.OrbitMenu) {
@@ -1042,17 +1205,27 @@ function init() {
 
   document.querySelectorAll('.botLvl').forEach((b) => b.addEventListener('click', () => startSolo(b.dataset.lvl)));
 
-  document.getElementById('createBtn').addEventListener('click', () => {
+  const createRoom = (slots) => {
     if (window.OrbitAudio) OrbitAudio.unlock();
     const nm = getNameOrWarn(); if (!nm) return;
-    botLevel = null; myName = nm; // PvP
+    botLevel = null; myName = nm; iAmHost = true; roomSlots = slots; // PvP
+    teamSel = {}; lobbyRoster = [];
     roomInput = OrbitNet.makeCode();
     document.getElementById('roomCodeVal').textContent = roomInput;
     document.getElementById('roomShare').hidden = false;
     lockInputs();
-    setLobbyMsg('Sala criada. Aguardando o adversário entrar com o código...');
-    hostRoom();
-  });
+    setLobbyMsg(slots === 4
+      ? 'Sala 2v2 criada. Envie o código para os outros 3 jogadores...'
+      : 'Sala criada. Aguardando o adversário entrar com o código...');
+    hostRoom(slots);
+  };
+  document.getElementById('createBtn').addEventListener('click', () => createRoom(2));
+  const c2 = document.getElementById('createBtn2');
+  if (c2) c2.addEventListener('click', () => createRoom(4));
+  const tlR = document.getElementById('tlRandom');
+  if (tlR) tlR.addEventListener('click', () => { if (iAmHost) randomTeams(); });
+  const tlS = document.getElementById('tlStart');
+  if (tlS) tlS.addEventListener('click', () => { if (iAmHost) hostStart2v2(); });
   document.getElementById('joinBtn').addEventListener('click', () => {
     if (window.OrbitAudio) OrbitAudio.unlock();
     const nm = getNameOrWarn(); if (!nm) return;

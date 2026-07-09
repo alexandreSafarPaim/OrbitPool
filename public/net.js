@@ -18,6 +18,7 @@ window.OrbitNet = {
   mode: 'p2p',
   _onMsg: null, _myName: '', _oppName: '',
   _ws: null, _peer: null, _conn: null,
+  _isHost: false, _slots: 2, _guests: [], _roster: null, _started: false,
 
   // Gera um código de sala curto e legível (sem caracteres ambíguos).
   makeCode() {
@@ -26,41 +27,57 @@ window.OrbitNet = {
     return s;
   },
 
-  hostRoom(code, name, onMsg) { this._begin(name, onMsg); if (this.mode === 'server') this._wsJoin(code); else this._p2pHost(code); },
-  joinRoom(code, name, onMsg) { this._begin(name, onMsg); if (this.mode === 'server') this._wsJoin(code); else this._p2pJoin(code); },
+  // slots: 2 (1v1) ou 4 (2v2). Só o host define; convidados descobrem no 'assign'.
+  hostRoom(code, name, onMsg, slots) {
+    this._begin(name, onMsg); this._isHost = true; this._slots = slots === 4 ? 4 : 2;
+    if (this.mode === 'server') this._wsJoin(code, this._slots); else this._p2pHost(code);
+  },
+  joinRoom(code, name, onMsg) { this._begin(name, onMsg); this._isHost = false; if (this.mode === 'server') this._wsJoin(code); else this._p2pJoin(code); },
 
   _begin(name, onMsg) {
     this.mode = /[?&]server\b/.test(location.search) ? 'server' : 'p2p';
     this._myName = name || 'Jogador'; this._onMsg = onMsg; this._oppName = '';
+    this._guests = []; this._roster = null; this._started = false;
   },
   _peerId(code) { return 'orbitpool-' + String(code).toLowerCase().replace(/[^a-z0-9]/g, ''); },
 
+  // Marca que a partida começou (o host chama ao enviar 'start' — muda o
+  // tratamento de desconexões: antes = atualizar lobby, depois = peer_left).
+  markStarted() { this._started = true; },
+
   send(obj) {
-    if (this.mode === 'server') { if (this._ws && this._ws.readyState === 1) this._ws.send(JSON.stringify(obj)); }
-    else { if (this._conn && this._conn.open) { try { this._conn.send(obj); } catch (e) {} } }
+    if (this.mode === 'server') { if (this._ws && this._ws.readyState === 1) this._ws.send(JSON.stringify(obj)); return; }
+    if (this._isHost) { // host = hub: repassa a todos os convidados
+      for (const g of this._guests) { if (g.open) { try { g.send(obj); } catch (e) {} } }
+    } else if (this._conn && this._conn.open) { try { this._conn.send(obj); } catch (e) {} }
   },
 
   // ---- Servidor WebSocket (modo ?server) ----------------------------------
-  _wsJoin(code) {
+  _wsJoin(code, slots) {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
     const ws = new WebSocket(`${proto}://${location.host}`);
     this._ws = ws;
-    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', room: code, name: this._myName }));
+    ws.onopen = () => ws.send(JSON.stringify({ t: 'join', room: code, name: this._myName, slots: slots || undefined }));
     ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } this._onMsg(m); };
     ws.onclose = () => this._onMsg({ t: '_neterror', msg: 'Conexão com o servidor encerrada. Recarregue a página.' });
     ws.onerror = () => this._onMsg({ t: '_neterror', msg: 'Não foi possível conectar ao servidor.' });
   },
 
-  // ---- P2P via PeerJS -----------------------------------------------------
+  // ---- P2P via PeerJS (host = hub em estrela p/ até 4 jogadores) -----------
   _p2pHost(code) {
     if (!window.Peer) return this._onMsg({ t: '_neterror', msg: 'A rede P2P (PeerJS) não carregou. Verifique sua conexão/bloqueadores.' });
     const peer = new Peer(this._peerId(code)); this._peer = peer;
+    this._roster = [{ no: 1, name: this._myName }];
     peer.on('open', () => {
-      this._onMsg({ t: 'joined', playerNo: 1 });
+      this._onMsg({ t: 'joined', playerNo: 1, slots: this._slots });
       this._onMsg({ t: 'waiting' });
+      if (this._slots === 4) this._emitLobby();
       peer.on('connection', (conn) => {
-        if (this._conn) { try { conn.close(); } catch (e) {} return; } // sala cheia
-        this._setupConn(conn, true);
+        if (this._guests.length >= this._slots - 1 || this._started) {
+          conn.on('open', () => { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} });
+          return;
+        }
+        this._setupHostConn(conn);
       });
     });
     peer.on('error', (err) => {
@@ -69,13 +86,70 @@ window.OrbitNet = {
       else this._onMsg({ t: '_neterror', msg: 'Erro de rede: ' + t });
     });
   },
+  _nextNo() { // menor playerNo livre (2..slots)
+    for (let no = 2; no <= this._slots; no++) if (!this._roster.some((p) => p.no === no)) return no;
+    return 0;
+  },
+  _emitLobby() {
+    const m = { t: 'lobby', players: this._roster.slice(), slots: this._slots };
+    this._onMsg(m);
+    for (const g of this._guests) { if (g.open) { try { g.send(m); } catch (e) {} } }
+  },
+  _setupHostConn(conn) {
+    conn.on('data', (m) => {
+      if (!m || !m.t) return;
+      if (m.t === '_hello') {
+        if (conn._no) return; // hello duplicado
+        const no = this._nextNo();
+        if (!no) { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} return; }
+        conn._no = no; conn._name = (m.name || 'Jogador').slice(0, 20);
+        this._guests.push(conn);
+        this._roster.push({ no, name: conn._name });
+        try { conn.send({ t: 'assign', playerNo: no, slots: this._slots }); } catch (e) {}
+        if (this._slots === 2) {
+          // 1v1: começa direto (comportamento original)
+          this._oppName = conn._name; this._started = true;
+          this._onMsg({ t: 'start', opponent: this._oppName, startTurn: 1 });
+          try { conn.send({ t: 'start', opponent: this._myName, startTurn: 1 }); } catch (e) {}
+        } else {
+          this._emitLobby(); // 2v2: todos veem o lobby de times
+        }
+        return;
+      }
+      // Relay em estrela: entrega local + repassa aos demais convidados.
+      const out = { ...m, from: conn._no || 0 };
+      this._onMsg(out);
+      for (const g of this._guests) { if (g !== conn && g.open) { try { g.send(out); } catch (e) {} } }
+    });
+    const drop = () => this._dropGuest(conn);
+    conn.on('close', drop);
+    conn.on('error', drop);
+  },
+  _dropGuest(conn) {
+    const i = this._guests.indexOf(conn);
+    if (i < 0) return;
+    this._guests.splice(i, 1);
+    this._roster = this._roster.filter((p) => p.no !== conn._no);
+    if (this._started) {
+      const m = { t: 'peer_left', no: conn._no };
+      this._onMsg(m);
+      for (const g of this._guests) { if (g.open) { try { g.send(m); } catch (e) {} } }
+    } else if (this._slots === 4) {
+      this._emitLobby(); // ainda no lobby: só atualiza a lista
+    } else {
+      this._onMsg({ t: 'peer_left' });
+    }
+  },
   _p2pJoin(code) {
     if (!window.Peer) return this._onMsg({ t: '_neterror', msg: 'A rede P2P (PeerJS) não carregou. Verifique sua conexão/bloqueadores.' });
     const peer = new Peer(); this._peer = peer;
     peer.on('open', () => {
-      this._onMsg({ t: 'joined', playerNo: 2 });
       const conn = peer.connect(this._peerId(code), { reliable: true });
-      this._setupConn(conn, false);
+      this._conn = conn;
+      conn.on('open', () => { try { conn.send({ t: '_hello', name: this._myName }); } catch (e) {} });
+      conn.on('data', (m) => { if (m && m.t) this._onMsg(m); });
+      conn.on('close', () => this._onMsg({ t: 'peer_left' }));
+      conn.on('error', () => this._onMsg({ t: 'peer_left' }));
       setTimeout(() => { if (!this._conn || !this._conn.open) this._onMsg({ t: '_neterror', msg: 'Não encontrei a sala. Confira o código (o host precisa ter criado a sala e estar online).' }); }, 9000);
     });
     peer.on('error', (err) => {
@@ -83,23 +157,5 @@ window.OrbitNet = {
       if (/peer-unavailable/i.test(t)) this._onMsg({ t: '_neterror', msg: 'Sala não encontrada. Confira o código com o host.' });
       else this._onMsg({ t: '_neterror', msg: 'Erro de rede: ' + t });
     });
-  },
-  _setupConn(conn, iAmHost) {
-    this._conn = conn;
-    conn.on('open', () => { try { conn.send({ t: '_hello', name: this._myName }); } catch (e) {} });
-    conn.on('data', (m) => {
-      if (!m || !m.t) return;
-      if (m.t === '_hello') {
-        this._oppName = m.name || 'Adversário';
-        if (iAmHost) {
-          this._onMsg({ t: 'start', opponent: this._oppName, startTurn: 1 });
-          try { conn.send({ t: 'start', opponent: this._myName, startTurn: 1 }); } catch (e) {}
-        }
-        return;
-      }
-      this._onMsg(m);
-    });
-    conn.on('close', () => this._onMsg({ t: 'peer_left' }));
-    conn.on('error', () => this._onMsg({ t: 'peer_left' }));
   },
 };

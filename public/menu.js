@@ -10,12 +10,24 @@
 
 window.OrbitSettings = (function () {
   const LSKEY = 'orbitpool.settings';
-  let s = { sensitivity: 1.0 }; // multiplicador (0.25–2.5), 1 = padrão
-  try { const j = JSON.parse(localStorage.getItem(LSKEY) || '{}'); if (j && typeof j.sensitivity === 'number') s.sensitivity = j.sensitivity; } catch (e) {}
+  // Sensibilidade por EIXO (multiplicadores 0.25–2.5, 1 = padrão):
+  //   sensX = mouse horizontal (girar o taco); sensY = vertical (altura da câmera).
+  let s = { sensX: 1.0, sensY: 1.0 };
+  try {
+    const j = JSON.parse(localStorage.getItem(LSKEY) || '{}');
+    if (j && typeof j.sensitivity === 'number') { s.sensX = j.sensitivity; s.sensY = j.sensitivity; } // migra o formato antigo
+    if (j && typeof j.sensX === 'number') s.sensX = j.sensX;
+    if (j && typeof j.sensY === 'number') s.sensY = j.sensY;
+  } catch (e) {}
   function save() { try { localStorage.setItem(LSKEY, JSON.stringify(s)); } catch (e) {} }
+  const clampS = (v) => Math.max(0.25, Math.min(2.5, +v || 1));
   return {
-    sensitivity() { return s.sensitivity; },
-    setSensitivity(v) { s.sensitivity = Math.max(0.25, Math.min(2.5, +v || 1)); save(); },
+    sensitivity() { return s.sensX; }, // compat: quem chamar o antigo recebe o X
+    setSensitivity(v) { s.sensX = clampS(v); save(); },
+    sensitivityX() { return s.sensX; },
+    sensitivityY() { return s.sensY; },
+    setSensitivityX(v) { s.sensX = clampS(v); save(); },
+    setSensitivityY(v) { s.sensY = clampS(v); save(); },
   };
 })();
 
@@ -82,10 +94,14 @@ window.OrbitMenu = (function () {
     sc.appendChild(slider('Efeitos sonoros', () => OrbitAudio.getVolume('sfx'), (v) => OrbitAudio.setVolume('sfx', v)));
     sc.appendChild(slider('Música', () => OrbitAudio.getVolume('music'), (v) => OrbitAudio.setVolume('music', v)));
 
-    const sensRow = slider('Sensibilidade da câmera', () => (OrbitSettings.sensitivity() - 0.25) / 2.25,
-      (t) => OrbitSettings.setSensitivity(0.25 + t * 2.25), () => OrbitSettings.sensitivity().toFixed(2) + '×');
-    sensRow.classList.add('obm-only3d');
-    sc.appendChild(sensRow);
+    const sensXRow = slider('Sensibilidade horizontal (mira)', () => (OrbitSettings.sensitivityX() - 0.25) / 2.25,
+      (t) => OrbitSettings.setSensitivityX(0.25 + t * 2.25), () => OrbitSettings.sensitivityX().toFixed(2) + '×');
+    sensXRow.classList.add('obm-only3d');
+    sc.appendChild(sensXRow);
+    const sensYRow = slider('Sensibilidade vertical (câmera)', () => (OrbitSettings.sensitivityY() - 0.25) / 2.25,
+      (t) => OrbitSettings.setSensitivityY(0.25 + t * 2.25), () => OrbitSettings.sensitivityY().toFixed(2) + '×');
+    sensYRow.classList.add('obm-only3d');
+    sc.appendChild(sensYRow);
 
     const bBack = h('button', 'obm-btn', 'Voltar');
     bBack.onclick = showPause;

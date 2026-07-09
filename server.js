@@ -57,8 +57,8 @@ const server = http.createServer((req, res) => {
 let nextId = 1;
 const rooms = new Map(); // roomId -> { clients: Set<Conn> }
 
-function makeRoom(id) {
-  const room = { id, clients: new Set() };
+function makeRoom(id, slots) {
+  const room = { id, clients: new Set(), slots: slots === 4 ? 4 : 2, started: false };
   rooms.set(id, room);
   return room;
 }
@@ -200,8 +200,14 @@ function leaveRoom(conn) {
   if (!room) return;
   room.clients.delete(conn);
   conn.room = null;
-  broadcastRoom(room, { t: 'peer_left' });
+  if (!room.started && room.slots === 4) broadcastLobby(room); // ainda no lobby de times
+  else broadcastRoom(room, { t: 'peer_left', no: conn.playerNo });
   if (room.clients.size === 0) rooms.delete(room.id);
+}
+
+function broadcastLobby(room) {
+  const players = [...room.clients].map((c) => ({ no: c.playerNo, name: c.name }));
+  broadcastRoom(room, { t: 'lobby', players, slots: room.slots });
 }
 
 function handleMessage(conn, raw) {
@@ -217,37 +223,41 @@ function handleMessage(conn, raw) {
       const roomId = (msg.room || 'sala1').toString().slice(0, 24);
       conn.name = (msg.name || 'Jogador').toString().slice(0, 20);
       let room = rooms.get(roomId);
-      if (!room) room = makeRoom(roomId);
+      if (!room) room = makeRoom(roomId, msg.slots | 0); // 1º a entrar (host) define 2 ou 4 vagas
 
-      if (room.clients.size >= 2) {
+      if (room.clients.size >= room.slots || room.started) {
         conn.send({ t: 'full' });
         return;
       }
 
       room.clients.add(conn);
       conn.room = room;
-      conn.playerNo = room.clients.size; // 1 ou 2
+      // Menor playerNo livre (1..slots) — estável mesmo se alguém sair do lobby.
+      const used = new Set([...room.clients].filter((c) => c !== conn).map((c) => c.playerNo));
+      for (let no = 1; no <= room.slots; no++) { if (!used.has(no)) { conn.playerNo = no; break; } }
 
-      conn.send({ t: 'joined', playerNo: conn.playerNo, room: roomId, name: conn.name });
+      conn.send({ t: 'joined', playerNo: conn.playerNo, room: roomId, name: conn.name, slots: room.slots });
 
-      if (room.clients.size === 2) {
-        // Envia início: informa a cada um o nome do adversário e quem começa (P1).
+      if (room.slots === 2 && room.clients.size === 2) {
+        // 1v1: começa direto (comportamento original).
+        room.started = true;
         const [a, b] = [...room.clients];
         a.send({ t: 'start', you: a.playerNo, opponent: b.name, startTurn: 1 });
         b.send({ t: 'start', you: b.playerNo, opponent: a.name, startTurn: 1 });
+      } else if (room.slots === 4) {
+        broadcastLobby(room); // 2v2: lobby de times (o host organiza e envia 'start')
       } else {
         conn.send({ t: 'waiting' });
       }
       break;
     }
 
-    // Mensagens de jogo repassadas ao adversário (o shooter é a fonte da verdade).
-    case 'shot':
-    case 'aim':
-    case 'ballcue':
-    case 'chat':
-    case 'rematch': {
-      if (conn.room) broadcastRoom(conn.room, { ...msg, from: conn.playerNo }, conn);
+    // Demais mensagens de jogo: relay para todos os outros da sala (o shooter
+    // é a fonte da verdade; 'start'/'teams' vêm do host no 2v2).
+    default: {
+      if (!conn.room) break;
+      if (msg.t === 'start') conn.room.started = true;
+      broadcastRoom(conn.room, { ...msg, from: conn.playerNo }, conn);
       break;
     }
   }
