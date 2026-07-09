@@ -24,7 +24,7 @@ window.OrbitBot = (function () {
     iniciante: { sigmaAng: 0.070, sigmaPow: 0.16, english: 0.06, minCos: 0.45, mc: 0,  posW: 0,   pickTop: 4, pickRandom: 0.60, think: [700, 1100] },
     amador:    { sigmaAng: 0.021, sigmaPow: 0.08, english: 0.02, minCos: 0.30, mc: 6,  posW: 25,  pickTop: 3, pickRandom: 0.25, think: [800, 1300] },
     pro:       { sigmaAng: 0.010, sigmaPow: 0.045,english: 0.00, minCos: 0.20, mc: 12, posW: 60,  pickTop: 2, pickRandom: 0.06, think: [900, 1500] },
-    baianinho: { sigmaAng: 0.0009,sigmaPow: 0.010,english: 0.00, minCos: 0.10, mc: 20, posW: 140, pickTop: 1, pickRandom: 0.00, think: [700, 1200] },
+    mineirinho: { sigmaAng: 0.0009,sigmaPow: 0.010,english: 0.00, minCos: 0.10, mc: 20, posW: 140, pickTop: 1, pickRandom: 0.00, think: [700, 1200] },
   };
 
   const groupOf = (n) => (n === 8 ? 'eight' : (n >= 1 && n <= 7 ? 'solid' : (n >= 9 && n <= 15 ? 'stripe' : null)));

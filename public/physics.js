@@ -346,6 +346,12 @@ const Physics = (function () {
     const df = (t) => ((4 * c4 * t + 3 * c3) * t + 2 * c2) * t + c1;
     const tol = 1e-3 * (targetDist * targetDist); // tolerância relativa ao alvo
 
+    // Par JÁ SOBREPOSTO (dist < alvo) e se aproximando: colide imediatamente.
+    // Sem isto não existe raiz "chegando a 2R vindo de fora" e as bolas se
+    // ATRAVESSAM (ex.: bola encostada/sobreposta perto da boca da caçapa).
+    // resolveBallBall já reposiciona o par para a distância de contato.
+    if (c0 < -tol && c1 < -1e-3) return 1e-5;
+
     let best = Infinity;
     for (const t of polyRealRoots(coeffs)) {
       if (t <= 1e-6) continue;               // ignora colisão recém-resolvida (§10.2)
@@ -694,6 +700,10 @@ const Physics = (function () {
   // Empurra pares sobrepostos até a distância 2R e mantém dentro dos limites.
   function separateOverlaps(balls) {
     const minX = R, maxX = W - R, minY = R, maxY = H - R;
+    // Na BOCA da caçapa o centro pode ficar legitimamente além da linha dos
+    // rails (bola "pendurada" nos chanfros). Clampar essa bola de volta ao
+    // retângulo a teleportava para cima do rail — e podia sobrepô-la a outra.
+    const nearPocket = (b) => PCAPS.some((p) => Math.hypot(b.x - p.x, b.y - p.y) < p.cap + 2.5 * R);
     for (let iter = 0; iter < 30; iter++) {
       let moved = false;
       for (let i = 0; i < balls.length; i++) {
@@ -713,7 +723,7 @@ const Physics = (function () {
         }
       }
       for (const b of balls) {
-        if (b.potted) continue;
+        if (b.potted || nearPocket(b)) continue;
         b.x = Math.max(minX, Math.min(maxX, b.x));
         b.y = Math.max(minY, Math.min(maxY, b.y));
       }
