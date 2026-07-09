@@ -27,7 +27,13 @@ window.OrbitAudio = (function () {
     lose: 'sfx/lose.mp3',     // derrota
     foul: 'sfx/foul.mp3',     // falta / bola branca encaçapada
   };
-  const MUSIC_TRACKS = ['music/music1.mp3', 'music/music2.mp3', 'music/music3.mp3'];
+  const MUSIC_TRACKS = [
+    'music/music1.mp3', 'music/music2.mp3', 'music/music3.mp3',
+    'music/amassado-e-jogado.mp3', 'music/cola-no-interior.mp3',
+    'music/ligacoes-a-noite.mp3', 'music/se-ela-me-ouvisse-cantar.mp3',
+    'music/festa-do-interior.mp3', 'music/o-campeao-sertanejo.mp3',
+    'music/angel-in-my-eyes.mp3', 'music/american-western-country.mp3',
+  ];
 
   let ctx = null, master = null, sfx = null, music = null;
   let muted = false;
@@ -182,6 +188,30 @@ window.OrbitAudio = (function () {
   }
   function stopMusic() { if (musicEl) { try { musicEl.pause(); } catch (e) {} } }
 
+  // --- Controles de playlist (atalhos de teclado) ---------------------------
+  function titleOf(i) { // nome do arquivo → título legível ("cola-no-interior" → "cola no interior")
+    return MUSIC_TRACKS[i].split('/').pop().replace(/\.mp3$/, '').replace(/[-_]+/g, ' ');
+  }
+  function musicInfo() {
+    return { idx: musicIdx, total: MUSIC_TRACKS.length, title: titleOf(musicIdx), playing: !!(musicEl && !musicEl.paused) };
+  }
+  function skipMusic(dir) {
+    unlock();
+    if (!musicEl) { startMusic(); return musicInfo(); }
+    musicIdx = (musicIdx + dir + MUSIC_TRACKS.length) % MUSIC_TRACKS.length;
+    musicEl.src = MUSIC_TRACKS[musicIdx];
+    playCurrent();
+    return musicInfo();
+  }
+  function nextMusic() { return skipMusic(1); }
+  function prevMusic() { return skipMusic(-1); }
+  function toggleMusic() { // pause ↔ play
+    unlock();
+    if (!musicEl) { startMusic(); return musicInfo(); }
+    if (musicEl.paused) playCurrent(); else { try { musicEl.pause(); } catch (e) {} }
+    return musicInfo();
+  }
+
   // --- Controles de volume/mudo -------------------------------------------
   function setVolume(bus, v) {
     v = clamp(+v || 0, 0, 1); if (!(bus in vol)) return;
@@ -193,5 +223,7 @@ window.OrbitAudio = (function () {
   function toggleMute() { setMuted(!muted); return muted; }
   function isMuted() { return muted; }
 
-  return { unlock, cue, clack, cushion, pocket, win, lose, foul, startMusic, stopMusic, setVolume, getVolume, setMuted, toggleMute, isMuted };
+  return { unlock, cue, clack, cushion, pocket, win, lose, foul, startMusic, stopMusic,
+    nextMusic, prevMusic, toggleMusic, musicInfo,
+    setVolume, getVolume, setMuted, toggleMute, isMuted };
 })();

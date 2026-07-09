@@ -300,6 +300,24 @@
     /* campo de nome obrigatório em destaque quando vazio */
     .lbCard input.err { border-color: #ff6b6b; box-shadow: 0 0 0 3px rgba(255,107,107,.18); }
     .lbCard input.err::placeholder { color: #ff9d9d; }
+    .createRow { display: flex; gap: 8px; }
+    .createRow .btnPrimary { flex: 1; }
+    .btn2v2 { background: linear-gradient(180deg, #7c5cff, #5b3fd6); }
+    .btn2v2:hover { filter: brightness(1.1); }
+    .tlPanel { min-width: 340px; max-width: 440px; }
+    #tlList { display: flex; flex-direction: column; gap: 8px; margin: 14px 0; }
+    .tlRow { display: flex; align-items: center; gap: 8px; background: rgba(255,255,255,.05);
+      border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: 9px 12px; }
+    .tlRow.empty { opacity: .45; font-style: italic; }
+    .tlName { flex: 1; text-align: left; font-weight: 700; font-size: 14px; }
+    .tlTeam { margin: 0; padding: 6px 12px; border-radius: 8px; font-size: 12px; font-weight: 800;
+      cursor: pointer; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); color: #9aa7b4; }
+    .tlTeam.t1.sel { background: rgba(52,211,153,.22); border-color: #34d399; color: #6ee7b7; }
+    .tlTeam.t2.sel { background: rgba(59,130,246,.22); border-color: #3b82f6; color: #93c5fd; }
+    .tlTeam:disabled { cursor: default; }
+    .tlBtns { display: flex; gap: 8px; justify-content: center; }
+    .tlGhost { background: rgba(255,255,255,.08); }
+    #tlStart:disabled { opacity: .45; cursor: default; }
     #lobby #lobbyMsg { color: var(--gold, #ffd24a); font-size: 13px; min-height: 16px; margin: 12px 0 0; }
     #lobby .share { margin-top: 14px; }
 
@@ -357,6 +375,7 @@
         <div class="krow"><span class="k">Shift</span><span class="d">ajustar efeito</span></div>
         <div class="krow"><span class="k">Tab</span><span class="d">ver de cima</span></div>
         <div class="krow"><span class="k">Scroll</span><span class="d">zoom</span></div>
+        <div class="krow"><span class="k">N · B · M</span><span class="d">música: próxima · anterior · pausar</span></div>
         <div class="krow"><span class="k">Esc</span><span class="d">menu (pausa / config / sair)</span></div>
       </div>
     </div>
@@ -434,7 +453,10 @@
         <p class="cardSub">Escolha seu nome e comece uma partida.</p>
         <label class="fieldLbl" for="name">Seu nome</label>
         <div class="inputWrap"><span class="idot"></span><input id="name" maxlength="20" placeholder="Ex: Alex" /></div>
-        <button id="createBtn" class="btnPrimary">Criar nova sala →</button>
+        <div class="createRow">
+          <button id="createBtn" class="btnPrimary">Criar sala 1v1 →</button>
+          <button id="createBtn2" class="btnPrimary btn2v2">Criar sala 2v2 (duplas) →</button>
+        </div>
 
         <div class="orSep"><span>ou entre com um código</span></div>
         <div class="joinRow">
@@ -458,6 +480,19 @@
         <p id="lobbyMsg" class="msg"></p>
         <p class="cardHint">⚡ Conexão direta P2P. Pra testar sozinho, crie a sala numa aba e entre com o código em outra.</p>
       </div>
+    </div>
+  </div>
+
+  <div id="teamLobby" class="overlay hidden">
+    <div class="panel tlPanel">
+      <h1>🤝 Duplas — sala <span id="tlCode"></span></h1>
+      <p class="sub">O criador da sala monta os times. Rotação: A1 → B1 → A2 → B2.</p>
+      <div id="tlList"></div>
+      <div class="tlBtns">
+        <button id="tlRandom" class="tlGhost">🎲 Times aleatórios</button>
+        <button id="tlStart">Começar partida</button>
+      </div>
+      <p id="tlMsg" class="msg"></p>
     </div>
   </div>
 
