@@ -497,8 +497,12 @@ const Physics = (function () {
   // ===========================================================================
   // Deflexão do taco (squirt) quando há efeito lateral (a≠0) — usada tanto no
   // cálculo real da tacada quanto na pré-visualização da linha de mira.
+  // Convenção de 'a': >0 = taco bate à DIREITA do centro (visão do jogador,
+  // igual ao widget de efeito). O mundo RENDERIZADO é espelhado em relação ao
+  // referencial matemático (física x,y → three X,Z inverte a quiralidade;
+  // screen-right = ẑ×d̂), então os sinais abaixo já compensam isso.
   function squirtedDir(aimDir, a) {
-    const angle = Math.atan(a * K_SQUIRT);
+    const angle = Math.atan(-a * K_SQUIRT); // squirt deflete pro lado OPOSTO ao efeito
     const cosA = Math.cos(angle), sinA = Math.sin(angle);
     return { x: aimDir.x * cosA - aimDir.y * sinA, y: aimDir.x * sinA + aimDir.y * cosA };
   }
@@ -520,7 +524,10 @@ const Physics = (function () {
       miscue: false,
       vx: dir.x * speed, vy: dir.y * speed,
       wx: tHatX * b * spinMag, wy: tHatY * b * spinMag,
-      wz: a * spinMag,
+      // −a: no referencial formal do motor, bater à direita (a>0 na tela) gera
+      // wz negativo — que na TELA é o inglês direito real (tabela rebate pro
+      // mesmo lado, throw pro lado oposto, squirt pro lado oposto).
+      wz: -a * spinMag,
     };
   }
 
