@@ -22,7 +22,7 @@ let myNo = 0, oppName = 'Adversário', myName = 'Você';
 let currentTurn = 1;
 // Modo treino (single-player): botLevel != null → o adversário é a IA (jogador 2).
 let botLevel = null; const BOT_NO = 2; let botTimer = null;
-const BOT_NAMES = { iniciante: 'Bot Iniciante', amador: 'Bot Amador', pro: 'Bot Pro', baianinho: 'Baianinho de Mauá' };
+const BOT_NAMES = { iniciante: 'Bot Iniciante', amador: 'Bot Amador', pro: 'Bot Pro', mineirinho: 'Mineirinho de Araxá' };
 let phase = 'lobby';            // lobby | aim | sim | wait | ended
 let ballInHand = false;
 let ws = null, roomInput = 'sala1';
