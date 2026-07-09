@@ -18,7 +18,7 @@
 const W = 900;
 const H = 450;
 const RAIL = 34;
-const R = 10.5;
+const R = 9.8;
 const POCKET = 21;
 const MOUTH = 27;
 const MAX_SHOT = 1650;   // velocidade máx. de uma tacada central (unidades/s), ~10mph

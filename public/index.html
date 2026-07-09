@@ -289,6 +289,17 @@
     .btnJoin:hover { background: rgba(55,178,107,.12); }
     .btnJoin:disabled { opacity: .5; cursor: default; }
     .cardHint { margin: 16px 0 0; font-size: 12px; color: #66727f; line-height: 1.5; }
+    .botRow { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+    .botLvl { width: auto; margin: 0; padding: 11px 8px; border-radius: 10px; cursor: pointer; font-size: 13px; font-weight: 700;
+      background: rgba(255,255,255,.05); color: #cfe1f0; border: 1px solid #2b3949; transition: transform .08s, background .15s, border-color .15s; }
+    .botLvl:hover { background: rgba(255,255,255,.09); border-color: #3a4a5c; }
+    .botLvl:active { transform: scale(.97); }
+    .botLvl.baia { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px;
+      color: #ffd24a; border-color: rgba(255,210,74,.5); background: linear-gradient(180deg, rgba(255,210,74,.14), rgba(255,210,74,.06)); }
+    .botLvl.baia:hover { background: linear-gradient(180deg, rgba(255,210,74,.22), rgba(255,210,74,.1)); }
+    /* campo de nome obrigatório em destaque quando vazio */
+    .lbCard input.err { border-color: #ff6b6b; box-shadow: 0 0 0 3px rgba(255,107,107,.18); }
+    .lbCard input.err::placeholder { color: #ff9d9d; }
     #lobby #lobbyMsg { color: var(--gold, #ffd24a); font-size: 13px; min-height: 16px; margin: 12px 0 0; }
     #lobby .share { margin-top: 14px; }
 
@@ -436,6 +447,14 @@
           <div class="codeRow"><span id="roomCodeVal" class="code"></span><button id="copyCodeBtn" class="copy">Copiar</button></div>
         </div>
 
+        <div class="orSep"><span>ou treine com o bot</span></div>
+        <div class="botRow">
+          <button class="botLvl" data-lvl="iniciante">Iniciante</button>
+          <button class="botLvl" data-lvl="amador">Amador</button>
+          <button class="botLvl" data-lvl="pro">Pro</button>
+          <button class="botLvl baia" data-lvl="baianinho">🐐 Baianinho de Mauá</button>
+        </div>
+
         <p id="lobbyMsg" class="msg"></p>
         <p class="cardHint">⚡ Conexão direta P2P. Pra testar sozinho, crie a sala numa aba e entre com o código em outra.</p>
       </div>
@@ -506,8 +525,10 @@
               loadScript('audio.js', function () {
                 loadScript('menu.js', function () {
                   loadScript('net.js', function () {
-                    var g = function () { loadScript('game3d.js', function () {}, function () { fail('Falha ao carregar game3d.js'); }); };
-                    loadScript('table3d_collider.js', g, g); // colisor do modelo (opcional)
+                    loadScript('bot.js', function () {
+                      var g = function () { loadScript('game3d.js', function () {}, function () { fail('Falha ao carregar game3d.js'); }); };
+                      loadScript('table3d_collider.js', g, g); // colisor do modelo (opcional)
+                    }, function () { fail('Falha ao carregar bot.js'); });
                   }, function () { fail('Falha ao carregar net.js'); });
                 }, function () { fail('Falha ao carregar menu.js'); });
               }, function () { fail('Falha ao carregar audio.js'); });

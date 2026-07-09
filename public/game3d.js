@@ -20,6 +20,9 @@ const MAXDRAG_PX = 190;   // arraste (px de tela) para potência máxima
 let balls = [];
 let myNo = 0, oppName = 'Adversário', myName = 'Você';
 let currentTurn = 1;
+// Modo treino (single-player): botLevel != null → o adversário é a IA (jogador 2).
+let botLevel = null; const BOT_NO = 2; let botTimer = null;
+const BOT_NAMES = { iniciante: 'Bot Iniciante', amador: 'Bot Amador', pro: 'Bot Pro', baianinho: 'Baianinho de Mauá' };
 let phase = 'lobby';            // lobby | aim | sim | wait | ended
 let ballInHand = false;
 let ws = null, roomInput = 'sala1';
@@ -430,6 +433,7 @@ function endShot() {
   if (ballInHand && currentTurn === myNo) exitLock();
   cueOffset = { a: 0, b: 0 }; updateContactDot(); // efeito reseta a cada tacada
   updateHUD();
+  maybeBotTurn();
 }
 
 // ===========================================================================
@@ -784,6 +788,7 @@ function startGame() {
   if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   for (const b of balls) { const m = ballMeshes[b.n]; if (m) { m.quaternion.set(0, 0, 0, 1); m.position.set(b.x - W / 2, R, b.y - H / 2); m.visible = true; } }
   updateHUD();
+  maybeBotTurn();
 }
 function showEnd() {
   // Conta a vitória na série (determinístico → os dois lados incrementam igual).
@@ -808,7 +813,63 @@ function showEnd() {
 }
 function doRematch(initiator) {
   if (matchOver) { matchScore = { 1: 0, 2: 0 }; matchOver = false; } // fim da série → zera para a próxima
-  currentTurn = 1; if (initiator) send({ t: 'rematch' }); startGame();
+  currentTurn = 1; if (!botLevel && initiator) send({ t: 'rematch' }); startGame();
+}
+
+// ===========================================================================
+// Treino contra o bot (single-player)
+// ===========================================================================
+// Lê o nome; se vazio, avisa e destaca o campo (nome é obrigatório p/ jogar).
+function getNameOrWarn() {
+  const v = (document.getElementById('name').value || '').trim().slice(0, 20);
+  if (!v) {
+    setLobbyMsg('✍️ Digite seu nome para jogar.');
+    const el = document.getElementById('name'); el.classList.add('err'); el.focus();
+    return null;
+  }
+  return v;
+}
+function startSolo(level) {
+  if (window.OrbitAudio) OrbitAudio.unlock();
+  const nm = getNameOrWarn(); if (!nm) return;
+  myName = nm;
+  myNo = 1; botLevel = level; oppName = BOT_NAMES[level] || 'Bot';
+  matchScore = { 1: 0, 2: 0 }; matchOver = false;
+  currentTurn = 1; // você quebra
+  startGame();
+}
+// Se for a vez do bot, agenda a jogada dele.
+function maybeBotTurn() {
+  if (!botLevel || game.gameOver || currentTurn !== BOT_NO || phase === 'sim') return;
+  clearTimeout(botTimer);
+  botTimer = setTimeout(botTurn, 550);
+}
+function botTurn() {
+  if (!botLevel || game.gameOver || currentTurn !== BOT_NO || phase === 'sim') return;
+  const hint = document.getElementById('turnHint');
+  if (hint) hint.textContent = '🤖 ' + oppName + ' está pensando…';
+  // Deixa o "pensando" pintar antes do cálculo (que pode travar ~0.3s nos níveis altos).
+  setTimeout(() => {
+    if (!botLevel || game.gameOver || currentTurn !== BOT_NO || phase === 'sim') return;
+    let dec = null;
+    try {
+      dec = OrbitBot.decide({
+        balls: balls.map((b) => ({ n: b.n, x: b.x, y: b.y, potted: b.potted })),
+        botNo: BOT_NO, group: game.groups[BOT_NO], open: game.open,
+        ballInHand: ballInHand, level: botLevel,
+      });
+    } catch (e) { dec = null; }
+    if (!dec || !isFinite(dec.ang)) dec = { ang: Math.atan2(H / 2 - cue().y, W / 2 - cue().x), power: 0.5, a: 0, b: 0 };
+    if (dec.place) { placeCue(dec.place.x, dec.place.y); ballInHand = false; }
+    setAim(dec.ang); cueOffset = { a: dec.a || 0, b: dec.b || 0 };
+    oppAim = { ang: dec.ang, pow: dec.power }; // taco mira visivelmente
+    const th = dec.think ? dec.think[0] + Math.random() * (dec.think[1] - dec.think[0]) : 1000;
+    clearTimeout(botTimer);
+    botTimer = setTimeout(() => {
+      if (!botLevel || game.gameOver || currentTurn !== BOT_NO || phase === 'sim') return;
+      oppAim = null; shoot(dec.power);
+    }, th);
+  }, 60);
 }
 
 // ===========================================================================
@@ -905,8 +966,8 @@ function init() {
   canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onTouchMove(e); }, { passive: false });
   canvas.addEventListener('touchend', (e) => { e.preventDefault(); onTouchEnd(e); }, { passive: false });
 
-  const readName = () => (document.getElementById('name').value || 'Jogador').trim().slice(0, 20);
   const lockInputs = () => { ['createBtn', 'joinBtn'].forEach((id) => { document.getElementById(id).disabled = true; }); };
+  document.getElementById('name').addEventListener('input', () => { document.getElementById('name').classList.remove('err'); setLobbyMsg(''); });
 
   if (window.OrbitMenu) {
     OrbitMenu.init({
@@ -916,9 +977,12 @@ function init() {
     });
   }
 
+  document.querySelectorAll('.botLvl').forEach((b) => b.addEventListener('click', () => startSolo(b.dataset.lvl)));
+
   document.getElementById('createBtn').addEventListener('click', () => {
     if (window.OrbitAudio) OrbitAudio.unlock();
-    myName = readName();
+    const nm = getNameOrWarn(); if (!nm) return;
+    botLevel = null; myName = nm; // PvP
     roomInput = OrbitNet.makeCode();
     document.getElementById('roomCodeVal').textContent = roomInput;
     document.getElementById('roomShare').hidden = false;
@@ -928,9 +992,10 @@ function init() {
   });
   document.getElementById('joinBtn').addEventListener('click', () => {
     if (window.OrbitAudio) OrbitAudio.unlock();
+    const nm = getNameOrWarn(); if (!nm) return;
     const code = (document.getElementById('joinCode').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
     if (code.length < 3) { setLobbyMsg('Digite o código da sala que o host te enviou.'); return; }
-    myName = readName(); roomInput = code;
+    botLevel = null; myName = nm; roomInput = code;
     lockInputs();
     setLobbyMsg('Conectando à sala ' + code + '...'); joinRoom();
   });
