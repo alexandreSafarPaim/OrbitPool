@@ -3,73 +3,388 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>🎱 Bilhar Multiplayer</title>
-  <link rel="stylesheet" href="style.css" />
+  <title>🎱 OrbitPool</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0e14;
+      font-family: 'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif; color: #eee; }
+    .raj { font-family: 'Rajdhani', 'Inter', sans-serif; }
+    #c { position: fixed; inset: 0; display: block; }
+
+    .overlay { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 50% 30%, #16324a, #070b12 70%); z-index: 20; }
+    .overlay.hidden { display: none; }
+    .panel { background: #10161f; border: 1px solid #24303f; border-radius: 16px; padding: 28px 26px;
+      width: min(92vw, 380px); box-shadow: 0 20px 60px rgba(0,0,0,.5); text-align: center; }
+    .panel h1 { margin: 0 0 4px; font-size: 26px; }
+    .panel h1 span { color: #37b26b; }
+    .panel .sub { color: #9fb0c3; font-size: 14px; margin: 0 0 18px; }
+    label { display: block; text-align: left; font-size: 13px; color: #9fb0c3; margin: 10px 0 4px; }
+    input { width: 100%; padding: 10px 12px; border-radius: 9px; border: 1px solid #2b3949;
+      background: #0b1017; color: #fff; font-size: 15px; }
+    button { cursor: pointer; border: 0; border-radius: 10px; padding: 12px 16px; font-size: 15px;
+      font-weight: 600; background: #2f9e5a; color: #fff; margin-top: 16px; width: 100%; }
+    button:hover { background: #37b26b; }
+    .msg { color: #9fb0c3; font-size: 13px; min-height: 18px; margin: 12px 0 0; }
+    .hint { color: #6b7c90; font-size: 12px; margin-top: 12px; }
+    button.secondary { background: transparent; color: #7fe3a6; border: 1px solid rgba(55,178,107,.5); }
+    button.secondary:hover { background: rgba(55,178,107,.12); }
+    .sep { display: flex; align-items: center; gap: 10px; margin: 16px 0 4px; color: #6b7c90; font-size: 12px; }
+    .sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.1); }
+    .share { margin-top: 16px; padding: 12px; border: 1px dashed rgba(55,178,107,.5); border-radius: 10px; background: rgba(55,178,107,.06); }
+    .shareLbl { margin: 0 0 8px; font-size: 12px; color: #9fb0c3; }
+    .codeRow { display: flex; gap: 8px; align-items: stretch; }
+    .code { flex: 1; display: flex; align-items: center; justify-content: center; letter-spacing: 6px;
+      font-size: 26px; font-weight: 800; color: #7fe3a6; background: rgba(0,0,0,.35); border-radius: 8px; padding: 8px 0; user-select: all; }
+    .copy { width: auto !important; margin: 0 !important; padding: 0 14px !important; font-size: 13px !important; }
+
+    /* ===================== HUD (design) ===================== */
+    @keyframes hudFade { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+    #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; }
+    .glass { background: rgba(12,14,18,.74); border: 1px solid rgba(255,255,255,.09);
+      backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); }
+
+    /* brand topo-esquerda */
+    #brand { position: absolute; top: 20px; left: 22px; display: flex; align-items: center; gap: 10px;
+      padding: 8px 14px 8px 11px; border-radius: 12px; }
+    #brand .ball { width: 26px; height: 26px; border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      background: radial-gradient(circle at 32% 28%, #4ade80, #16794a);
+      box-shadow: inset -2px -3px 5px rgba(0,0,0,.35), inset 2px 2px 4px rgba(255,255,255,.35); }
+    #brand .ball i { width: 8px; height: 8px; border-radius: 50%; background: #fff; opacity: .9; display: block; }
+    #brand .name { font-weight: 700; font-size: 15px; letter-spacing: .06em; color: #f3f5f7; }
+    #brand .name b { color: #34d399; }
+    #brand .div { width: 1px; height: 20px; background: rgba(255,255,255,.12); }
+    #brand a { pointer-events: auto; font-size: 12px; font-weight: 500; color: #8b94a0; text-decoration: none; }
+    #brand a:hover { color: #cfd6de; }
+
+    /* placar central */
+    #scoreboard { position: absolute; top: 16px; left: 50%; transform: translateX(-50%);
+      display: flex; align-items: stretch; border-radius: 18px; overflow: hidden; max-width: 96vw;
+      box-shadow: 0 14px 40px rgba(0,0,0,.45); }
+    .pl { display: flex; align-items: center; padding: 14px 20px; border-left: 3px solid transparent;
+      border-right: 3px solid transparent; transition: background .2s; }
+    .pl .row { display: flex; align-items: center; gap: 12px; }
+    .pl.right .row { flex-direction: row-reverse; text-align: right; }
+    .pl.turn.left { background: linear-gradient(to right, rgba(52,211,153,.14), rgba(52,211,153,0)); border-left-color: #34d399; }
+    .pl.turn.right { background: linear-gradient(to left, rgba(52,211,153,.14), rgba(52,211,153,0)); border-right-color: #34d399; }
+    .avwrap { position: relative; flex: none; }
+    .av { width: 44px; height: 44px; border-radius: 12px; display: flex; align-items: center; justify-content: center;
+      font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 20px; color: #fff; }
+    .av.blue { background: linear-gradient(135deg,#3b82f6,#1e40af); }
+    .av.green { background: linear-gradient(135deg,#4ade80,#15803d); color: #052e16; }
+    .sdot { position: absolute; bottom: -3px; right: -3px; width: 15px; height: 15px; border-radius: 50%;
+      background: #3a4048; border: 2.5px solid #0e1014; }
+    .sdot.on { background: #34d399; box-shadow: 0 0 10px #34d399; }
+    .pinfo { min-width: 0; }
+    .nameline { display: flex; align-items: center; gap: 7px; }
+    .pl.right .nameline { flex-direction: row-reverse; }
+    .pname { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 17px; color: #eef1f4; letter-spacing: .01em;
+      max-width: 140px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .tag { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 10px; letter-spacing: .12em; padding: 2px 6px; border-radius: 5px; }
+    .tag.you { letter-spacing: .1em; color: #9aa3ad; background: rgba(255,255,255,.08); }
+    .tag.na { color: #052e16; background: #34d399; display: none; }
+    .pl.turn .tag.na { display: inline-block; }
+    .grpline { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+    .pl.right .grpline { flex-direction: row-reverse; }
+    .chips { display: flex; gap: 3px; }
+    .pl.right .chips { flex-direction: row-reverse; }
+    .chip { width: 19px; height: 19px; border-radius: 50%;
+      box-shadow: inset -2px -3px 4px rgba(0,0,0,.35), inset 2px 2px 3px rgba(255,255,255,.45); }
+    .chip.potted { filter: grayscale(1) brightness(.6); opacity: .28; }
+    .pgrp { font-size: 11px; color: #8b94a0; font-weight: 500; white-space: nowrap; }
+    #center { display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 12px 22px; background: rgba(0,0,0,.28); border-left: 1px solid rgba(255,255,255,.07); border-right: 1px solid rgba(255,255,255,.07); }
+    #center .lbl { font-family: 'Rajdhani',sans-serif; font-weight: 600; font-size: 10px; letter-spacing: .18em; color: #7b8492; }
+    .scoreRow { display: flex; align-items: baseline; gap: 9px; margin-top: 2px; font-family: 'Rajdhani',sans-serif; }
+    .scoreRow .s { font-weight: 700; font-size: 32px; line-height: 1; color: #c9d0d8; }
+    .scoreRow .s.me { color: #f4f6f8; }
+    .scoreRow .dash { font-weight: 600; font-size: 16px; color: #5c646f; }
+    #dashes { display: flex; gap: 4px; margin-top: 6px; }
+    #dashes i { width: 16px; height: 3px; border-radius: 2px; background: rgba(255,255,255,.14); display: block; }
+
+    /* controles topo-direita: botão + dropdown */
+    #ctrlWrap { position: absolute; top: 20px; right: 22px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto; }
+    #ctrlBtn { display: flex; align-items: center; gap: 9px; width: auto; margin: 0; padding: 9px 13px; border-radius: 12px; cursor: pointer; outline: none;
+      color: #e7ebf0; background: rgba(14,16,20,.72); border: 1px solid rgba(255,255,255,.09);
+      backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+    #ctrlBtn.open { border-color: rgba(255,255,255,.18); }
+    #ctrlBtn .lbl { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 13px; letter-spacing: .08em; }
+    #ctrlBtn .hk { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 11px; color: #0a0b0d; background: #cfd6de; padding: 1px 6px; border-radius: 5px; box-shadow: 0 1px 0 rgba(0,0,0,.4); }
+    #keys { width: 296px; padding: 8px; border-radius: 14px; box-shadow: 0 16px 44px rgba(0,0,0,.5); animation: hudFade .16s ease; }
+    #keys.hidden { display: none; }
+    #keys .krow { display: flex; align-items: center; gap: 12px; padding: 7px 8px; border-radius: 9px; }
+    #keys .k { flex: none; min-width: 58px; text-align: center; font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 12px;
+      letter-spacing: .04em; color: #e7ebf0; background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.1);
+      border-bottom-color: rgba(0,0,0,.4); padding: 5px 8px; border-radius: 7px; }
+    #keys .d { font-size: 12.5px; color: #b3bcc6; line-height: 1.3; }
+
+    /* banner da vez (embaixo centro) */
+    #turnWrap { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 8px; max-width: 92vw; }
+    #turnPill { display: flex; align-items: center; gap: 13px; padding: 12px 22px; border-radius: 14px; box-shadow: 0 12px 36px rgba(0,0,0,.5); }
+    #turnPill.mine { box-shadow: 0 12px 36px rgba(0,0,0,.5), 0 0 0 1px rgba(52,211,153,.25); }
+    #turnPill .tdot { width: 9px; height: 9px; border-radius: 50%; background: #3b82f6; box-shadow: 0 0 10px #3b82f6; flex: none; }
+    #turnPill.mine .tdot { background: #34d399; box-shadow: 0 0 10px #34d399; }
+    #statusText { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 19px; letter-spacing: .05em; color: #f4f6f8; }
+    #turnHint { font-size: 12.5px; color: #9aa3ad; text-align: center; min-height: 15px; }
+
+    /* efeito + força (canto inferior direito) */
+    #cueControls { position: absolute; bottom: 26px; right: 26px; display: none; align-items: flex-end; gap: 14px; }
+    #cueControls.show { display: flex; }
+    #effect { padding: 14px 14px 12px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .effBall { position: relative; width: 72px; height: 72px; border-radius: 50%;
+      background: radial-gradient(circle at 36% 30%, #ffffff, #cdd2d8 70%, #a7adb5);
+      box-shadow: inset -4px -6px 10px rgba(0,0,0,.28), inset 3px 3px 6px rgba(255,255,255,.7); }
+    .effBall .cx, .effBall .cy { position: absolute; left: 50%; top: 50%; background: rgba(0,0,0,.08); transform: translate(-50%,-50%); }
+    .effBall .cx { width: 1px; height: 100%; }
+    .effBall .cy { height: 1px; width: 100%; }
+    #effectDot { position: absolute; left: 50%; top: 50%; width: 16px; height: 16px; border-radius: 50%; background: #34d399;
+      transform: translate(-50%,-50%); box-shadow: 0 0 0 3px rgba(52,211,153,.28), 0 2px 4px rgba(0,0,0,.35); }
+    .lbl2 { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 10px; letter-spacing: .14em; color: #7b8492; }
+    #powerWrap { padding: 14px 16px 12px; border-radius: 16px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+    .forceTop { display: flex; align-items: flex-end; gap: 10px; }
+    .forceBar { position: relative; width: 16px; height: 96px; border-radius: 9px; overflow: hidden;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.08); }
+    #powerFill { position: absolute; bottom: 0; left: 0; right: 0; height: 0%; border-radius: 0 0 9px 9px;
+      background: linear-gradient(to top,#22c55e,#eab308 62%,#ef4444); }
+    #powerMark { position: absolute; left: -2px; right: -2px; height: 2px; bottom: 0%; background: #fff; box-shadow: 0 0 6px rgba(255,255,255,.7); }
+    .forceNum { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 30px; color: #f4f6f8; line-height: 1; }
+    .forceNum span { font-size: 15px; color: #8b94a0; }
+    .forceHint { display: flex; align-items: center; gap: 6px; opacity: .85; }
+    .forceHint .k { font-family: 'Rajdhani',sans-serif; font-weight: 700; font-size: 10px; color: #0a0b0d; background: #cfd6de; padding: 1px 5px; border-radius: 4px; }
+    .forceHint span { font-size: 10.5px; color: #8b94a0; }
+
+    /* overlay grande de efeito (ao segurar Shift) */
+    #contact { position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: 220px; height: 220px; border-radius: 50%; display: none;
+      background: radial-gradient(circle at 38% 32%, #ffffff, #dcdcd4 68%, #b6b6ae);
+      border: 3px solid rgba(0,0,0,.25); box-shadow: 0 14px 50px rgba(0,0,0,.55); }
+    #contact.show { display: block; }
+    #contactDot { position: absolute; width: 34px; height: 34px; border-radius: 50%; background: #34d399;
+      left: 50%; top: 50%; transform: translate(-50%,-50%); box-shadow: inset 0 0 0 3px rgba(0,0,0,.15); }
+    #contactLbl { position: absolute; left: 0; right: 0; bottom: -30px; text-align: center; font-size: 12px; color: #cfe1f0; }
+
+    /* ===================== LOBBY (nova tela) ===================== */
+    #lobby.overlay { background: radial-gradient(1200px 700px at 30% 20%, #14202c, #070b12 70%); }
+    .lobbyGrid { display: grid; grid-template-columns: 1.1fr .9fr; gap: 56px; align-items: center;
+      width: min(1120px, 92vw); }
+    .lbLeft { max-width: 520px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; font-size: 11px; font-weight: 800;
+      letter-spacing: 1.3px; color: #7fe3a6; text-transform: uppercase; padding: 6px 14px; border-radius: 999px;
+      background: rgba(55,178,107,.1); border: 1px solid rgba(55,178,107,.4); }
+    .badge .bdot { width: 8px; height: 8px; border-radius: 50%; background: #37b26b; box-shadow: 0 0 8px #37b26b; }
+    .lbTitle { display: flex; align-items: center; font-size: 52px; font-weight: 900; letter-spacing: 1px;
+      margin: 20px 0 0; color: #eef4fb; }
+    .lbTitle b { color: #37b26b; margin-left: 14px; font-weight: 900; }
+    .eight { position: relative; width: 62px; height: 62px; border-radius: 50%; margin-right: 20px; flex: none;
+      background: radial-gradient(circle at 38% 30%, #4a4a4a, #050505 72%);
+      box-shadow: inset 0 -6px 14px rgba(0,0,0,.6), 0 8px 18px rgba(0,0,0,.5); }
+    .eight::before { content: '8'; position: absolute; left: 50%; top: 50%; transform: translate(-50%,-50%);
+      width: 26px; height: 26px; border-radius: 50%; background: #fff; color: #111; font-size: 15px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center; }
+    .lbSub { color: #9fb0c3; font-size: 15px; line-height: 1.5; margin: 16px 0 0; max-width: 400px; }
+
+    .rack { display: flex; flex-direction: column; align-items: center; gap: 4px; margin: 30px 0 0; width: fit-content; }
+    .rrow { display: flex; gap: 4px; }
+    .rball { position: relative; width: 34px; height: 34px; border-radius: 50%; overflow: hidden;
+      box-shadow: inset -4px -5px 8px rgba(0,0,0,.5), inset 3px 3px 6px rgba(255,255,255,.25); }
+    .rball::after { content: ''; position: absolute; left: 22%; top: 16%; width: 30%; height: 26%;
+      background: rgba(255,255,255,.55); border-radius: 50%; filter: blur(1px); }
+    .rball.stripe { background: #f4f4ee !important; }
+    .rball.stripe .band { position: absolute; left: 0; right: 0; top: 28%; height: 44%; }
+
+    .howto { margin: 34px 0 0; }
+    .howHead { font-size: 11px; font-weight: 800; letter-spacing: 1.5px; color: #5f7286; text-transform: uppercase; }
+    .howGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 24px; margin-top: 12px; }
+    .howGrid > div { display: flex; align-items: center; font-size: 13px; color: #aebccb; }
+    .howGrid .k { display: inline-block; min-width: 46px; padding: 3px 8px; margin-right: 10px; font-size: 11px;
+      background: #1a2432; border: 1px solid #2b3949; border-radius: 6px; text-align: center; color: #dfe9f3; font-weight: 700; }
+
+    /* card direito */
+    .lbCard { background: rgba(14,20,28,.86); border: 1px solid #232f3d; border-radius: 20px; padding: 30px 28px;
+      box-shadow: 0 30px 80px rgba(0,0,0,.55); }
+    .lbCard h2 { margin: 0; font-size: 24px; font-weight: 800; color: #eef4fb; }
+    .cardSub { margin: 6px 0 22px; font-size: 14px; color: #8fa1b5; }
+    .fieldLbl { display: block; font-size: 11px; font-weight: 700; letter-spacing: 1px; color: #7c8da0;
+      text-transform: uppercase; margin-bottom: 8px; }
+    .inputWrap { position: relative; }
+    .inputWrap .idot { position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+      width: 9px; height: 9px; border-radius: 50%; background: #37b26b; }
+    .lbCard input { width: 100%; padding: 13px 14px 13px 32px; border-radius: 11px; border: 1px solid #2b3949;
+      background: #0b1119; color: #fff; font-size: 15px; outline: none; }
+    .lbCard input:focus { border-color: #37b26b; box-shadow: 0 0 0 3px rgba(55,178,107,.18); }
+    .lbCard input::placeholder { color: #566579; }
+    .btnPrimary { width: 100%; margin-top: 14px; padding: 14px; border: 0; border-radius: 12px; cursor: pointer;
+      font-size: 15px; font-weight: 800; color: #06110a; background: linear-gradient(180deg,#43c574,#2f9e5a);
+      box-shadow: 0 8px 22px rgba(47,158,90,.35); transition: transform .08s, filter .15s; }
+    .btnPrimary:hover { filter: brightness(1.06); }
+    .btnPrimary:active { transform: scale(.99); }
+    .btnPrimary:disabled { opacity: .5; cursor: default; }
+    .orSep { display: flex; align-items: center; gap: 12px; margin: 20px 0 16px; color: #5f7286;
+      font-size: 10px; font-weight: 700; letter-spacing: 1.2px; }
+    .orSep::before, .orSep::after { content: ''; flex: 1; height: 1px; background: #232f3d; }
+    .joinRow { display: flex; gap: 10px; align-items: stretch; }
+    .joinRow input { flex: 1 1 auto; min-width: 0; width: auto; padding-left: 14px; letter-spacing: 4px; font-weight: 700; text-transform: uppercase; }
+    .btnJoin { flex: 0 0 auto; width: auto; margin: 0; padding: 0 22px; border: 1px solid #2f9e5a; border-radius: 11px; cursor: pointer; white-space: nowrap;
+      background: transparent; color: #7fe3a6; font-weight: 700; font-size: 14px; }
+    .btnJoin:hover { background: rgba(55,178,107,.12); }
+    .btnJoin:disabled { opacity: .5; cursor: default; }
+    .cardHint { margin: 16px 0 0; font-size: 12px; color: #66727f; line-height: 1.5; }
+    #lobby #lobbyMsg { color: var(--gold, #ffd24a); font-size: 13px; min-height: 16px; margin: 12px 0 0; }
+    #lobby .share { margin-top: 14px; }
+
+    @media (max-width: 820px) {
+      .lobbyGrid { grid-template-columns: 1fr; gap: 26px; width: 92vw; }
+      .lbLeft { max-width: none; text-align: center; margin: 0 auto; }
+      .lbSub { margin-left: auto; margin-right: auto; }
+      .rack { margin-left: auto; margin-right: auto; }
+      .howGrid { max-width: 380px; margin-left: auto; margin-right: auto; }
+      .lbTitle { justify-content: center; font-size: 42px; }
+    }
+  </style>
 </head>
 <body>
-  <!-- Tela inicial / lobby -->
-  <div id="lobby" class="overlay">
-    <div class="panel">
-      <h1>🎱 Bilhar <span>Multiplayer</span></h1>
-      <p class="sub">8-Ball em tempo real. Crie uma sala e envie o código ao adversário.</p>
-      <label>Seu nome
-        <input id="name" type="text" maxlength="20" placeholder="Ex: Alex" />
-      </label>
+  <canvas id="c"></canvas>
 
-      <button id="createBtn">Criar sala</button>
-
-      <div class="sep"><span>ou</span></div>
-
-      <label>Código da sala
-        <input id="joinCode" type="text" maxlength="8" placeholder="Ex: K7QX" autocapitalize="characters" />
-      </label>
-      <button id="joinBtn" class="secondary">Entrar com código</button>
-
-      <!-- Mostrado ao host depois de criar a sala -->
-      <div id="roomShare" class="share" hidden>
-        <p class="shareLbl">Envie este código ao adversário:</p>
-        <div class="codeRow"><span id="roomCodeVal" class="code"></span><button id="copyCodeBtn" class="copy">Copiar</button></div>
-      </div>
-
-      <p id="lobbyMsg" class="msg"></p>
-      <p class="hint">Conexão direta P2P (sem servidor). Para testar sozinho, crie a sala numa aba e entre com o código em outra.</p>
-      <p class="hint">✨ Experimente a <a href="index3d.html" style="color:#8fd0a8">versão 3D</a>.</p>
+  <div id="hud">
+    <div id="brand" class="glass">
+      <div class="ball"><i></i></div>
+      <div class="name raj">Orbit<b>Pool</b></div>
     </div>
-  </div>
 
-  <!-- HUD do jogo -->
-  <div id="game" class="hidden">
-    <header id="hud">
-      <div class="player" id="p1">
-        <span class="pname">Jogador 1</span>
-        <span class="pgroup" id="p1group"></span>
-        <span class="pballs" id="p1balls"></span>
-      </div>
-      <div class="center">
-        <div id="status">Aguardando...</div>
-        <div id="powerbar"><div id="powerfill"></div></div>
-        <div id="englishPicker" title="Efeito na bola branca (arraste)">
-          <div id="englishDot"></div>
+    <div id="scoreboard" class="glass">
+      <div class="pl left" id="plL">
+        <div class="row">
+          <div class="avwrap"><div class="av blue" id="avL">A</div><div class="sdot" id="dotL"></div></div>
+          <div class="pinfo">
+            <div class="nameline"><span class="pname" id="nmL">Jogador</span><span class="tag na">NA VEZ</span></div>
+            <div class="grpline"><div class="chips" id="chipsL"></div><span class="pgrp" id="grpL">mesa aberta</span></div>
+          </div>
         </div>
       </div>
-      <div class="player right" id="p2">
-        <span class="pname">Jogador 2</span>
-        <span class="pgroup" id="p2group"></span>
-        <span class="pballs" id="p2balls"></span>
+      <div id="center">
+        <div class="lbl" id="sbSeries">MELHOR DE 5</div>
+        <div class="scoreRow"><span class="s" id="scoreL">0</span><span class="dash">—</span><span class="s me" id="scoreR">0</span></div>
+        <div id="dashes"></div>
       </div>
-    </header>
-
-    <div id="tableWrap">
-      <canvas id="table"></canvas>
+      <div class="pl right" id="plR">
+        <div class="row">
+          <div class="avwrap"><div class="av green" id="avR">V</div><div class="sdot" id="dotR"></div></div>
+          <div class="pinfo">
+            <div class="nameline"><span class="pname" id="nmR">Você</span><span class="tag you">VOCÊ</span><span class="tag na">NA VEZ</span></div>
+            <div class="grpline"><div class="chips" id="chipsR"></div><span class="pgrp" id="grpR">mesa aberta</span></div>
+          </div>
+        </div>
+      </div>
     </div>
 
-    <footer id="foot">
-      <span id="hintText">Arraste para trás da bola branca e solte para dar a tacada.</span>
-      <button id="muteBtn" title="Ligar/desligar som (M)">🔊</button>
-    </footer>
+    <div id="ctrlWrap">
+      <button id="ctrlBtn"><span>⌨</span><span class="lbl">CONTROLES</span><span class="hk">H</span></button>
+      <div id="keys" class="glass hidden">
+        <div class="krow"><span class="k">Clique</span><span class="d">travar cursor</span></div>
+        <div class="krow"><span class="k">Mouse</span><span class="d">girar o taco</span></div>
+        <div class="krow"><span class="k">Ctrl</span><span class="d">segurar + puxar = força · soltar = tacar</span></div>
+        <div class="krow"><span class="k">Shift</span><span class="d">ajustar efeito</span></div>
+        <div class="krow"><span class="k">Tab</span><span class="d">ver de cima</span></div>
+        <div class="krow"><span class="k">Scroll</span><span class="d">zoom</span></div>
+        <div class="krow"><span class="k">Esc</span><span class="d">menu (pausa / config / sair)</span></div>
+      </div>
+    </div>
+
+    <div id="turnWrap">
+      <div id="turnPill" class="glass mine"><div class="tdot"></div><span id="statusText">Conectando...</span></div>
+      <div id="turnHint"></div>
+    </div>
+
+    <div id="cueControls">
+      <div id="effect" class="glass">
+        <div class="effBall"><div class="cx"></div><div class="cy"></div><div id="effectDot"></div></div>
+        <span class="lbl2">EFEITO</span>
+      </div>
+      <div id="powerWrap" class="glass">
+        <div class="forceTop">
+          <div class="forceBar"><div id="powerFill"></div><div id="powerMark"></div></div>
+          <div><div class="forceNum"><span id="powerPct">0</span><span>%</span></div><div class="lbl2" style="margin-top:3px">FORÇA</div></div>
+        </div>
+        <div class="forceHint"><span class="k">CTRL</span><span>segurar + puxar</span></div>
+      </div>
+    </div>
+
+    <div id="contact"><div id="contactDot"></div><div id="contactLbl">efeito / ponto de contato</div></div>
   </div>
 
-  <!-- Overlay de fim de jogo -->
+  <div id="lobby" class="overlay">
+    <div class="lobbyGrid">
+      <div class="lbLeft">
+        <div class="badge"><span class="bdot"></span>Multiplayer P2P · sem servidor</div>
+        <h1 class="lbTitle"><span class="eight"></span>Orbit<b>Pool</b></h1>
+        <p class="lbSub">8-Ball em 3D com física real. Crie uma sala, mande o código pro amigo e joguem direto, sem cadastro.</p>
+
+        <div class="rack">
+          <div class="rrow">
+            <div class="rball" style="background:#f4c20d"></div>
+          </div>
+          <div class="rrow">
+            <div class="rball" style="background:#1f4fb3"></div>
+            <div class="rball stripe"><span class="band" style="background:#d0342c"></span></div>
+          </div>
+          <div class="rrow">
+            <div class="rball stripe"><span class="band" style="background:#1a8f4c"></span></div>
+            <div class="rball" style="background:#6f2da8"></div>
+            <div class="rball" style="background:#e8791e"></div>
+          </div>
+          <div class="rrow">
+            <div class="rball" style="background:#7a1f2b"></div>
+            <div class="rball" style="background:#141414"></div>
+            <div class="rball stripe"><span class="band" style="background:#f4c20d"></span></div>
+            <div class="rball stripe"><span class="band" style="background:#1f4fb3"></span></div>
+          </div>
+          <div class="rrow">
+            <div class="rball" style="background:#d0342c"></div>
+            <div class="rball" style="background:#1a8f4c"></div>
+            <div class="rball stripe"><span class="band" style="background:#e8791e"></span></div>
+            <div class="rball stripe"><span class="band" style="background:#6f2da8"></span></div>
+            <div class="rball" style="background:#7a1f2b"></div>
+          </div>
+        </div>
+
+        <div class="howto">
+          <div class="howHead">Como jogar</div>
+          <div class="howGrid">
+            <div><span class="k">Mouse</span>gira o taco</div>
+            <div><span class="k">Ctrl</span>segurar + puxar = força</div>
+            <div><span class="k">Scroll</span>zoom</div>
+            <div><span class="k">Esc</span>menu / pausa</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="lbCard">
+        <h2>Entrar no jogo</h2>
+        <p class="cardSub">Escolha seu nome e comece uma partida.</p>
+        <label class="fieldLbl" for="name">Seu nome</label>
+        <div class="inputWrap"><span class="idot"></span><input id="name" maxlength="20" placeholder="Ex: Alex" /></div>
+        <button id="createBtn" class="btnPrimary">Criar nova sala →</button>
+
+        <div class="orSep"><span>ou entre com um código</span></div>
+        <div class="joinRow">
+          <input id="joinCode" maxlength="8" placeholder="K7QX" autocapitalize="characters" />
+          <button id="joinBtn" class="btnJoin">Entrar</button>
+        </div>
+
+        <div id="roomShare" class="share" hidden>
+          <p class="shareLbl">Envie este código ao adversário:</p>
+          <div class="codeRow"><span id="roomCodeVal" class="code"></span><button id="copyCodeBtn" class="copy">Copiar</button></div>
+        </div>
+
+        <p id="lobbyMsg" class="msg"></p>
+        <p class="cardHint">⚡ Conexão direta P2P. Pra testar sozinho, crie a sala numa aba e entre com o código em outra.</p>
+      </div>
+    </div>
+  </div>
+
   <div id="endOverlay" class="overlay hidden">
     <div class="panel">
       <h1 id="endTitle">Fim de jogo</h1>
@@ -79,11 +394,72 @@
     </div>
   </div>
 
-  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
-  <script src="physics.js"></script>
-  <script src="audio.js"></script>
-  <script src="menu.js"></script>
-  <script src="net.js"></script>
-  <script src="game.js"></script>
+  <script>
+    // Carregamento resiliente do Three.js: tenta um arquivo LOCAL (se você
+    // baixou three.min.js na pasta public/) e, se não houver, vários CDNs em
+    // sequência. Assim não depende de um CDN específico que o navegador/extensão
+    // possa bloquear. Se nada carregar, mostra um erro claro no lobby.
+    (function () {
+      var SRCS = [
+        'three.min.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+        'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+        'https://unpkg.com/three@0.128.0/build/three.min.js'
+      ];
+      function fail(msg) {
+        var el = document.getElementById('lobbyMsg');
+        if (el) el.textContent = msg;
+      }
+      function loadScript(src, ok, err) {
+        var s = document.createElement('script');
+        s.src = src; s.onload = ok; s.onerror = err;
+        document.head.appendChild(s);
+      }
+      function tryThree(i) {
+        if (i >= SRCS.length) { fail('Não consegui carregar a engine 3D (Three.js). Desative bloqueadores/extensões para localhost, ou baixe o three.min.js para a pasta do jogo.'); return; }
+        loadScript(SRCS[i], function () {
+          if (window.THREE) startApp(); else tryThree(i + 1);
+        }, function () { tryThree(i + 1); });
+      }
+      // OBJLoader (opcional): para a mesa em modelo 3D. Se não carregar, o jogo
+      // segue com a mesa procedural.
+      var OBJ_SRCS = [
+        'OBJLoader.js',
+        'https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/loaders/OBJLoader.js',
+        'https://unpkg.com/three@0.128.0/examples/js/loaders/OBJLoader.js'
+      ];
+      function loadObjLoader(done) {
+        (function tryO(i) {
+          if (i >= OBJ_SRCS.length) { done(); return; }
+          loadScript(OBJ_SRCS[i], function () { if (THREE.OBJLoader) done(); else tryO(i + 1); }, function () { tryO(i + 1); });
+        })(0);
+      }
+      // PeerJS (rede P2P). Se falhar, o net.js mostra erro ao tentar conectar.
+      var PEER_SRCS = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
+      function loadPeer(done) {
+        (function tryP(i) {
+          if (i >= PEER_SRCS.length) { done(); return; }
+          loadScript(PEER_SRCS[i], function () { if (window.Peer) done(); else tryP(i + 1); }, function () { tryP(i + 1); });
+        })(0);
+      }
+      function startApp() {
+        loadObjLoader(function () {
+          loadPeer(function () {
+            loadScript('physics.js', function () {
+              loadScript('audio.js', function () {
+                loadScript('menu.js', function () {
+                  loadScript('net.js', function () {
+                    var g = function () { loadScript('game3d.js', function () {}, function () { fail('Falha ao carregar game3d.js'); }); };
+                    loadScript('table3d_collider.js', g, g); // colisor do modelo (opcional)
+                  }, function () { fail('Falha ao carregar net.js'); });
+                }, function () { fail('Falha ao carregar menu.js'); });
+              }, function () { fail('Falha ao carregar audio.js'); });
+            }, function () { fail('Falha ao carregar physics.js'); });
+          });
+        });
+      }
+      tryThree(0);
+    })();
+  </script>
 </body>
 </html>

@@ -80,12 +80,7 @@ function showWebGLError() {
     tip.className = 'hint';
     tip.innerHTML = 'Cole na barra de endereços, ligue <b>"Usar aceleração de hardware quando disponível"</b> e reinicie o Chrome. Confira em <b>chrome://gpu</b>. (O Chrome não deixa esta página abrir <i>chrome://</i> direto — por isso o botão copia o endereço.)';
 
-    const twoD = document.createElement('button');
-    twoD.textContent = '▶ Jogar a versão 2D';
-    twoD.style.cssText = 'margin:0;background:#22303f';
-    twoD.onclick = () => { location.href = 'index.html'; };
-
-    wrap.appendChild(copyBtn); wrap.appendChild(tip); wrap.appendChild(twoD);
+    wrap.appendChild(copyBtn); wrap.appendChild(tip);
     m.parentNode.appendChild(wrap);
   }
   ['joinBtn', 'createBtn'].forEach((id) => {
