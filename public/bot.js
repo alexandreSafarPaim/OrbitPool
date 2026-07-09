@@ -35,8 +35,8 @@ window.OrbitBot = (function () {
   // Constrói o snapshot com a branca em (cx,cy) e velocidade da tacada.
   function makeSnapshot(balls, cx, cy, ang, power, a, b) {
     const aim = { x: Math.cos(ang), y: Math.sin(ang) };
-    const dir = Physics.squirtedDir(aim, a);
-    let st = Physics.cueStrike(power, dir, a, b);
+    // cueStrike já aplica o squirt internamente — não aplicar squirtedDir antes.
+    let st = Physics.cueStrike(power, aim, a, b);
     if (st.miscue) return null;
     return balls.map((ball) => {
       const o = { n: ball.n, x: ball.x, y: ball.y, vx: 0, vy: 0, wx: 0, wy: 0, wz: 0, potted: ball.potted };
@@ -129,7 +129,7 @@ window.OrbitBot = (function () {
       if (targetIsEight) return { score: 100000, res, info }; // vitória
       return { score: -8000, res, info }; // 8 fora de hora
     }
-    if (tPotted) s += 1000;
+    if (tPotted) s += 1000 + (1 - power) * 60; // prefere pot suave: não chacoalha nos jaws
     for (const n of info.potted) {
       if (n === 8 || n === T.n) continue;
       s += (groupOf(n) === ctx.group || ctx.open) ? 120 : -160; // bônus própria / penal. adversária
@@ -198,8 +198,15 @@ window.OrbitBot = (function () {
         if (!pathClear(balls, cue.x, cue.y, gx, gy, T.n, 2 * R - 2)) continue;
         if (!pathClear(balls, T.x, T.y, p.x, p.y, T.n, R + 2)) continue;
         const power = clamp(0.30 + 0.00075 * (dcg + 1.5 * dop) + (1 - cos) * 0.35, 0.32, 0.98);
-        const sc = scoreShot(balls, cue, T, ang, power, 0, 0, ctx);
-        if (sc) cand.push({ ang, power, a: 0, b: 0, T, ...sc });
+        // Variantes por candidata (níveis com MC): força cheia × mais suave, e
+        // centro × stun (b<0). Suave entra mansa na caçapa (não chacoalha nos
+        // jaws); stun segura a branca no tiro reto (evita scratch de follow).
+        const powers = (!quick && L.mc > 0) ? [power, clamp(power * 0.7, 0.32, 0.98)] : [power];
+        const spins = (!quick && L.mc > 0) ? [0, -0.24] : [0];
+        for (const pw of powers) for (const sb of spins) {
+          const sc = scoreShot(balls, cue, T, ang, pw, 0, sb, ctx);
+          if (sc) cand.push({ ang, power: pw, a: 0, b: sb, T, ...sc });
+        }
       }
     }
     if (!cand.length) return safety(balls, cue, state, L, ctx);
@@ -208,15 +215,18 @@ window.OrbitBot = (function () {
     // Monte Carlo nos melhores (níveis altos): reestima com ruído de mira.
     if (!quick && L.mc > 0) {
       for (const c of cand.slice(0, 3)) {
+        if (c.score <= 0) continue; // multiplicar score negativo o deixaria MENOS negativo (melhor) — errado
         let pots = 0;
         for (let i = 0; i < L.mc; i++) {
-          const sc = scoreShot(balls, cue, c.T, c.ang + gauss(L.sigmaAng), c.power + gauss(L.sigmaPow * 0.5), 0, 0, ctx);
+          const sc = scoreShot(balls, cue, c.T, c.ang + gauss(L.sigmaAng), c.power + gauss(L.sigmaPow * 0.5), c.a, c.b, ctx);
           if (sc && sc.tPotted && sc.score > 0) pots++;
         }
         c.score = c.score * (0.35 + 0.65 * (pots / L.mc)); // pondera pela robustez
       }
       cand.sort((x, y) => y.score - x.score);
     }
+    // Todas as candidatas ruins (scratch/erro quase certo)? Melhor jogar segurança.
+    if (cand[0].score < -400) return safety(balls, cue, state, L, ctx);
 
     // Escolha imperfeita nos níveis baixos.
     let pick = cand[0];
