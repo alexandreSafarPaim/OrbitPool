@@ -50,6 +50,13 @@ const Physics = (function () {
   const CUSHION_SPIN_SHIFT = 0.2;      // inglês desloca a tangencial no rebote (f_spin §7.1)
   const CUSHION_WZ_RETAIN = 0.65;      // fração do spin vertical retida após o rebote
 
+  // Jaws/chanfros da CAÇAPA: o facing (couro/borracha) absorve muito mais que
+  // a almofada — numa mesa real a bola que bate na boca MORRE e cai, não é
+  // cuspida de volta. Restituição e tangencial bem menores que as da tabela.
+  const REST_JAW_BASE = 0.55;
+  const JAW_TANGENT_FACTOR = 0.76;
+  const JAW_WZ_RETAIN = 0.5;
+
   const CUE_MASS_RATIO = 0.3; // m/M (bola ~0,17kg / taco ~0,57kg) — §5.2
   const K_SQUIRT = 0.075;     // deflexão do taco com efeito lateral (§5.4)
   const MAX_OFFSET = 0.5;     // limite físico de (a,b) — além disso é miscue (§5.1)
@@ -71,7 +78,7 @@ const Physics = (function () {
   // menores que a diagonal do rail (R√2) e centros empurrados para dentro do
   // buraco evitam "sugar" bolas que só passam rente ao rail.
   const CAP_CORNER = 14;  // raio de captura da caçapa de canto
-  const CAP_MID = 12;     // raio de captura da caçapa do meio
+  const CAP_MID = 11;     // raio de captura da caçapa do meio
   const PD = 6;           // quanto o centro da caçapa fica para dentro do buraco
   const XL = R, XR = W - R, YT = R, YB = H - R;   // linhas de contato dos rails
   const MX = W / 2;
@@ -111,6 +118,9 @@ const Physics = (function () {
     // meio base
     makeSeg(MX - MT, YB, MX - MT + CHF, YB + CHF, CX, CY), makeSeg(MX + MT, YB, MX + MT - CHF, YB + CHF, CX, CY),
   ];
+
+  // Marca os chanfros como "jaw" (boca de caçapa): rebote morto (§ acima).
+  for (const c of CHAMFERS) c.jaw = true;
 
   // Geometria de colisão (substituível via setTable p/ usar o contorno de um
   // modelo 3D). Por padrão = geometria analítica (usada pelo 2D).
@@ -463,23 +473,28 @@ const Physics = (function () {
   // Reflexão da bola numa parede de normal interna (nx,ny) — rail, chanfro ou
   // a ponta (jaw) de um rail. Restituição depende da velocidade normal e o
   // inglês (ωz) desloca a tangencial (§7.1).
-  function resolveWall(b, nx, ny) {
+  function resolveWall(b, nx, ny, jaw) {
     const vn = b.vx * nx + b.vy * ny; // componente ao longo da normal interna
     if (vn >= 0) return;              // já se afastando → não é impacto (guard energia)
     const tx = -ny, ty = nx;
     const vt = b.vx * tx + b.vy * ty;
     const vnMps = Math.abs(vn) * WORLD_TO_MPS;
-    const e = Math.min(0.90, Math.max(0.65, REST_RAIL_BASE - REST_RAIL_VEL_DROP * vnMps));
+    // Jaw (boca da caçapa): facing absorvente — rebote morto p/ a bola cair.
+    const e = jaw
+      ? Math.max(0.28, REST_JAW_BASE - REST_RAIL_VEL_DROP * vnMps)
+      : Math.min(0.90, Math.max(0.65, REST_RAIL_BASE - REST_RAIL_VEL_DROP * vnMps));
+    const CUSHION_TANGENT = jaw ? JAW_TANGENT_FACTOR : CUSHION_TANGENT_FACTOR;
+    const WZ_RETAIN = jaw ? JAW_WZ_RETAIN : CUSHION_WZ_RETAIN;
 
     const vnOut = -e * vn;
     // Contato no lado da almofada (−R·n̂): slip do inglês = −R·ωz·t̂; o atrito
     // se opõe ao slip ⇒ Δvt = +f_spin·R·ωz (running english alarga o rebote,
     // check side encurta — consistente com o throw bola-bola e docs §7.1).
-    const vtOut = vt * CUSHION_TANGENT_FACTOR + CUSHION_SPIN_SHIFT * R * b.wz;
+    const vtOut = vt * CUSHION_TANGENT + CUSHION_SPIN_SHIFT * R * b.wz;
 
     b.vx = vnOut * nx + vtOut * tx;
     b.vy = vnOut * ny + vtOut * ty;
-    b.wz *= CUSHION_WZ_RETAIN;
+    b.wz *= WZ_RETAIN;
     // Empurra levemente para dentro para não redetectar a mesma colisão.
     b.x += nx * 1e-3; b.y += ny * 1e-3;
     classify(b);
@@ -489,7 +504,7 @@ const Physics = (function () {
   function resolveTip(b, tip) {
     let dx = b.x - tip.x, dy = b.y - tip.y;
     const d = Math.hypot(dx, dy) || 1e-6;
-    resolveWall(b, dx / d, dy / d);
+    resolveWall(b, dx / d, dy / d, true); // ponta do rail = boca da caçapa → rebote morto
   }
 
   // ===========================================================================
@@ -497,8 +512,12 @@ const Physics = (function () {
   // ===========================================================================
   // Deflexão do taco (squirt) quando há efeito lateral (a≠0) — usada tanto no
   // cálculo real da tacada quanto na pré-visualização da linha de mira.
+  // Convenção de 'a': >0 = taco bate à DIREITA do centro (visão do jogador,
+  // igual ao widget de efeito). O mundo RENDERIZADO é espelhado em relação ao
+  // referencial matemático (física x,y → three X,Z inverte a quiralidade;
+  // screen-right = ẑ×d̂), então os sinais abaixo já compensam isso.
   function squirtedDir(aimDir, a) {
-    const angle = Math.atan(a * K_SQUIRT);
+    const angle = Math.atan(-a * K_SQUIRT); // squirt deflete pro lado OPOSTO ao efeito
     const cosA = Math.cos(angle), sinA = Math.sin(angle);
     return { x: aimDir.x * cosA - aimDir.y * sinA, y: aimDir.x * sinA + aimDir.y * cosA };
   }
@@ -520,7 +539,10 @@ const Physics = (function () {
       miscue: false,
       vx: dir.x * speed, vy: dir.y * speed,
       wx: tHatX * b * spinMag, wy: tHatY * b * spinMag,
-      wz: a * spinMag,
+      // −a: no referencial formal do motor, bater à direita (a>0 na tela) gera
+      // wz negativo — que na TELA é o inglês direito real (tabela rebate pro
+      // mesmo lado, throw pro lado oposto, squirt pro lado oposto).
+      wz: -a * spinMag,
     };
   }
 
@@ -581,22 +603,23 @@ const Physics = (function () {
           const t = approachTime(coeffs[i], phantom, R);
           if (t < bestT) { bestT = t; bestEvent = { type: 'tip', i, tip }; }
         }
+        // Captura por círculo na BOCA (nos dois modos): a bola cai quando o
+        // centro passa sobre o buraco — como numa mesa real, onde ela despenca
+        // na boca em vez de precisar viajar até o fundo da garganta.
+        for (const p of PCAPS) {
+          const t = approachTime(coeffs[i], { x0: p.x, y0: p.y, vx0: 0, vy0: 0, ax: 0, ay: 0 }, p.cap);
+          if (t < bestT) { bestT = t; bestEvent = { type: 'escape', i }; }
+        }
         if (customTable) {
-          // Colisor de modelo: captura por círculo na GARGANTA (fundo da boca,
-          // atrás dos jaws). Os jaws (contorno) defletem antes; só cai quem
-          // chega à garganta. + rede de segurança externa generosa.
-          for (const p of PCAPS) {
-            const t = approachTime(coeffs[i], { x0: p.x, y0: p.y, vx0: 0, vy0: 0, ax: 0, ay: 0 }, p.cap);
-            if (t < bestT) { bestT = t; bestEvent = { type: 'escape', i }; }
-          }
+          // Colisor de modelo: rede de segurança externa generosa.
           const M = 45;
           const esc = Math.min(
             boundTime(coeffs[i], true, -M), boundTime(coeffs[i], true, W + M),
             boundTime(coeffs[i], false, -M), boundTime(coeffs[i], false, H + M));
           if (esc < bestT) { bestT = esc; bestEvent = { type: 'escape', i }; }
         } else {
-          // Geometria analítica (2D): captura quando o CENTRO cruza o FUNDO da
-          // boca (CAPD além da borda). As tabelas seguram o centro no resto.
+          // Geometria analítica (2D): backstop — centro cruzou o FUNDO da boca
+          // (CAPD além da borda) sem passar pelo círculo? Cai do mesmo jeito.
           const cap = Math.min(
             boundTime(coeffs[i], true, -CAPD), boundTime(coeffs[i], true, W + CAPD),
             boundTime(coeffs[i], false, -CAPD), boundTime(coeffs[i], false, H + CAPD));
@@ -634,7 +657,7 @@ const Physics = (function () {
         const { i, seg } = bestEvent;
         const b = cur[i];
         const vimp = Math.abs(b.vx * seg.nx + b.vy * seg.ny);
-        resolveWall(b, seg.nx, seg.ny);
+        resolveWall(b, seg.nx, seg.ny, !!seg.jaw);
         events.push({ t: tCur, type: 'cushion', n: b.n, v: vimp });
         closeAndReopen(i, tCur);
       } else if (bestEvent.type === 'tip') {
