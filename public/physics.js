@@ -611,16 +611,27 @@ const Physics = (function () {
         closeAndReopen(bestEvent.i, tCur);
       } else if (bestEvent.type === 'ballball') {
         const { i, j } = bestEvent;
-        resolveBallBall(cur[i], cur[j]);
-        events.push({ t: tCur, type: 'contact', a: cur[i].n, b: cur[j].n });
+        const A = cur[i], B = cur[j];
+        const ddx = B.x - A.x, ddy = B.y - A.y, LL = Math.hypot(ddx, ddy) || 1e-9;
+        const nnx = ddx / LL, nny = ddy / LL;
+        const vimp = Math.abs((A.vx - B.vx) * nnx + (A.vy - B.vy) * nny); // aprox. normal
+        resolveBallBall(A, B);
+        events.push({ t: tCur, type: 'contact', a: A.n, b: B.n, v: vimp });
         closeAndReopen(i, tCur); closeAndReopen(j, tCur);
       } else if (bestEvent.type === 'wall') {
         const { i, seg } = bestEvent;
-        resolveWall(cur[i], seg.nx, seg.ny);
+        const b = cur[i];
+        const vimp = Math.abs(b.vx * seg.nx + b.vy * seg.ny);
+        resolveWall(b, seg.nx, seg.ny);
+        events.push({ t: tCur, type: 'cushion', n: b.n, v: vimp });
         closeAndReopen(i, tCur);
       } else if (bestEvent.type === 'tip') {
         const { i, tip } = bestEvent;
-        resolveTip(cur[i], tip);
+        const b = cur[i];
+        let ddx = b.x - tip.x, ddy = b.y - tip.y; const dd = Math.hypot(ddx, ddy) || 1e-6;
+        const vimp = Math.abs(b.vx * (ddx / dd) + b.vy * (ddy / dd));
+        resolveTip(b, tip);
+        events.push({ t: tCur, type: 'cushion', n: b.n, v: vimp });
         closeAndReopen(i, tCur);
       } else if (bestEvent.type === 'pocket' || bestEvent.type === 'escape') {
         const { i } = bestEvent;
@@ -663,10 +674,13 @@ const Physics = (function () {
       closeAndReopen(i, tCur);
     }
 
+    const cueB = initialBalls.find((b) => b.n === 0);
+    const cueSpeed = cueB ? Math.hypot(cueB.vx || 0, cueB.vy || 0) : 0;
     return {
       duration: tCur,
       segments,
       events,
+      cueSpeed,
       finalBalls: cur.map((b) => ({ n: b.n, x: b.x, y: b.y, potted: b.potted })),
     };
   }

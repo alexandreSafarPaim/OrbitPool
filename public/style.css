@@ -86,6 +86,24 @@ html, body {
   transition: transform 0.08s;
 }
 .panel button:active { transform: scale(0.98); }
+.panel button.secondary {
+  background: transparent; color: var(--gold);
+  border: 1px solid rgba(212, 175, 55, 0.5);
+}
+
+/* Separador "ou" */
+.sep { display: flex; align-items: center; gap: 10px; margin: 16px 0 4px; color: #66727f; font-size: 12px; }
+.sep::before, .sep::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,0.1); }
+
+/* Área de compartilhar código (host) */
+.share { margin-top: 16px; padding: 12px; border: 1px dashed rgba(212,175,55,0.5);
+  border-radius: 10px; background: rgba(212,175,55,0.06); }
+.shareLbl { margin: 0 0 8px; font-size: 12px; color: #9fb0c3; }
+.codeRow { display: flex; gap: 8px; align-items: stretch; }
+.code { flex: 1; display: flex; align-items: center; justify-content: center; letter-spacing: 6px;
+  font-size: 26px; font-weight: 800; color: var(--gold); background: rgba(0,0,0,0.35);
+  border-radius: 8px; padding: 8px 0; user-select: all; }
+.copy { width: auto !important; margin: 0 !important; padding: 0 14px !important; font-size: 13px !important; }
 
 .msg { margin-top: 14px; font-size: 14px; min-height: 18px; color: var(--gold); }
 .hint { margin-top: 18px; font-size: 12px; color: #66727f; line-height: 1.5; }
@@ -192,4 +210,11 @@ html, body {
   color: #66727f;
   background: #161c24;
   border-top: 1px solid #262f3b;
+  position: relative;
 }
+#muteBtn {
+  position: absolute; right: 10px; top: 50%; transform: translateY(-50%);
+  width: auto; margin: 0; padding: 4px 8px; font-size: 16px; line-height: 1;
+  background: transparent; border: 1px solid #2b3949; border-radius: 8px; cursor: pointer;
+}
+#muteBtn:active { transform: translateY(-50%) scale(0.95); }

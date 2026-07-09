@@ -11,17 +11,29 @@
   <div id="lobby" class="overlay">
     <div class="panel">
       <h1>🎱 Bilhar <span>Multiplayer</span></h1>
-      <p class="sub">8-Ball em tempo real. Entre na mesma sala que um amigo.</p>
+      <p class="sub">8-Ball em tempo real. Crie uma sala e envie o código ao adversário.</p>
       <label>Seu nome
         <input id="name" type="text" maxlength="20" placeholder="Ex: Alex" />
       </label>
-      <label>Sala
-        <input id="room" type="text" maxlength="24" placeholder="Ex: sala1" />
+
+      <button id="createBtn">Criar sala</button>
+
+      <div class="sep"><span>ou</span></div>
+
+      <label>Código da sala
+        <input id="joinCode" type="text" maxlength="8" placeholder="Ex: K7QX" autocapitalize="characters" />
       </label>
-      <button id="joinBtn">Entrar na sala</button>
+      <button id="joinBtn" class="secondary">Entrar com código</button>
+
+      <!-- Mostrado ao host depois de criar a sala -->
+      <div id="roomShare" class="share" hidden>
+        <p class="shareLbl">Envie este código ao adversário:</p>
+        <div class="codeRow"><span id="roomCodeVal" class="code"></span><button id="copyCodeBtn" class="copy">Copiar</button></div>
+      </div>
+
       <p id="lobbyMsg" class="msg"></p>
-      <p class="hint">Dica: compartilhe o nome da sala com o adversário. Você também pode abrir em duas abas para testar.</p>
-      <p class="hint">✨ Novidade: experimente a <a href="index3d.html" style="color:#8fd0a8">versão 3D</a>.</p>
+      <p class="hint">Conexão direta P2P (sem servidor). Para testar sozinho, crie a sala numa aba e entre com o código em outra.</p>
+      <p class="hint">✨ Experimente a <a href="index3d.html" style="color:#8fd0a8">versão 3D</a>.</p>
     </div>
   </div>
 
@@ -53,6 +65,7 @@
 
     <footer id="foot">
       <span id="hintText">Arraste para trás da bola branca e solte para dar a tacada.</span>
+      <button id="muteBtn" title="Ligar/desligar som (M)">🔊</button>
     </footer>
   </div>
 
@@ -66,7 +79,11 @@
     </div>
   </div>
 
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
   <script src="physics.js"></script>
+  <script src="audio.js"></script>
+  <script src="menu.js"></script>
+  <script src="net.js"></script>
   <script src="game.js"></script>
 </body>
 </html>

@@ -23,10 +23,16 @@ let currentTurn = 1;
 let phase = 'lobby';            // lobby | aim | sim | wait | ended
 let ballInHand = false;
 let ws = null, roomInput = 'sala1';
-let currentShot = null, shotElapsed = 0, shotQueue = [];
+let currentShot = null, shotElapsed = 0, shotQueue = [], soundCursor = 0;
 let cueOffset = { a: 0, b: 0 };
 
 const game = { open: true, groups: { 1: null, 2: null }, gameOver: false, winner: 0, lastMsg: '' };
+
+// Série melhor-de-5 (primeiro a 3 vitórias vence o match). Placar sincronizado
+// sem rede extra: os dois lados calculam o vencedor de cada partida de forma
+// idêntica (mesma timeline determinística), então incrementam igual.
+const SERIES_GAMES = 5, SERIES_TARGET = 3;
+let matchScore = { 1: 0, 2: 0 }, matchOver = false;
 
 // ===========================================================================
 // Three.js — cena
@@ -82,13 +88,17 @@ function showWebGLError() {
     wrap.appendChild(copyBtn); wrap.appendChild(tip); wrap.appendChild(twoD);
     m.parentNode.appendChild(wrap);
   }
-  const b = document.getElementById('joinBtn');
-  if (b) { b.disabled = true; b.style.opacity = 0.5; b.textContent = 'WebGL indisponível'; }
+  ['joinBtn', 'createBtn'].forEach((id) => {
+    const b = document.getElementById(id);
+    if (b) { b.disabled = true; b.style.opacity = 0.5; }
+  });
+  const cb = document.getElementById('createBtn');
+  if (cb) cb.textContent = 'WebGL indisponível';
 }
 
 const scene = new THREE.Scene();
 scene.background = new THREE.Color('#0a0e14');
-const camera = new THREE.PerspectiveCamera(45, 1, 10, 9000);
+const camera = new THREE.PerspectiveCamera(55, 1, 10, 20000);
 
 // Luzes
 scene.add(new THREE.HemisphereLight(0xffffff, 0x2a3540, 0.75));
@@ -244,6 +254,7 @@ function buildBalls() {
     const mat = new THREE.MeshStandardMaterial({ map: ballTexture(n), roughness: 0.28, metalness: 0.05 });
     const mesh = new THREE.Mesh(new THREE.SphereGeometry(R, 40, 28), mat);
     mesh.castShadow = true;
+    mesh.userData.shiny = true; // reflete mais o ambiente (bar) que o feltro/madeira
     scene.add(mesh);
     ballMeshes[n] = mesh;
   }
@@ -362,7 +373,7 @@ function evaluateShot(ev) {
     game.gameOver = true; game.winner = legal ? shooter : opp;
     game.lastMsg = legal ? `Bola 8 encaçapada! ${playerName(shooter)} venceu! 🏆`
       : `${playerName(shooter)} encaçapou a 8 fora de hora. ${playerName(opp)} venceu!`;
-    return { nextTurn: game.winner, ballInHand: false };
+    return { nextTurn: game.winner, ballInHand: false, foul };
   }
   let continueTurn = false;
   if (!foul && game.open && numbered.length) {
@@ -381,7 +392,7 @@ function evaluateShot(ev) {
   if (foul) { nextTurn = opp; bih = true; game.lastMsg = `Falta: ${reasons[0]}. ${playerName(opp)} joga com a bola na mão.`; }
   else if (continueTurn) nextTurn = shooter;
   else { nextTurn = opp; if (!game.lastMsg) game.lastMsg = `Vez de ${playerName(opp)}.`; }
-  return { nextTurn, ballInHand: bih };
+  return { nextTurn, ballInHand: bih, foul };
 }
 
 // ===========================================================================
@@ -393,8 +404,21 @@ function startPlayback(shot) {
     shot.duration = 0;
   }
   shot.duration = Math.min(shot.duration, 30);
-  currentShot = shot; shotElapsed = 0; phase = 'sim';
+  currentShot = shot; shotElapsed = 0; soundCursor = 0; phase = 'sim';
+  if (window.OrbitAudio) OrbitAudio.cue(shot.cueSpeed || 900); // som da tacada (t=0)
   hideAim(); updateHUD();
+}
+
+// Dispara os efeitos sonoros conforme a animação passa por cada evento.
+function fireShotSounds() {
+  if (!window.OrbitAudio || !currentShot || !currentShot.events) return;
+  const evs = currentShot.events;
+  while (soundCursor < evs.length && evs[soundCursor].t <= shotElapsed) {
+    const e = evs[soundCursor++];
+    if (e.type === 'contact') OrbitAudio.clack(e.v || 0);
+    else if (e.type === 'cushion') OrbitAudio.cushion(e.v || 0);
+    else if (e.type === 'pocket' || e.type === 'cuepotted') OrbitAudio.pocket();
+  }
 }
 
 function endShot() {
@@ -402,6 +426,7 @@ function endShot() {
   for (const fb of shot.finalBalls) { const b = ballByN(fb.n); if (b) { b.x = fb.x; b.y = fb.y; b.potted = fb.potted; b.vx = b.vy = b.wx = b.wy = b.wz = 0; } }
   const result = evaluateShot(deriveRuleEvents(shot.events));
   currentTurn = result.nextTurn; ballInHand = result.ballInHand;
+  if (result.foul && !game.gameOver && window.OrbitAudio) OrbitAudio.foul();
   if (cue().potted) { const c = cue(); c.potted = false; c.x = W * 0.25; c.y = H / 2; }
   if (game.gameOver) { shotQueue = []; showEnd(); return; }
   if (shotQueue.length > 0) { startPlayback(shotQueue.shift()); return; }
@@ -415,23 +440,19 @@ function endShot() {
 // ===========================================================================
 // Rede (mesmo protocolo do 2D)
 // ===========================================================================
-function connect() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}`);
-  ws.onopen = () => send({ t: 'join', room: roomInput, name: myName });
-  ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } handleNet(m); };
-  ws.onclose = () => setLobbyMsg('Conexão encerrada. Recarregue a página.');
-}
-function send(o) { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); }
+function hostRoom() { OrbitNet.hostRoom(roomInput, myName, handleNet); } // cria sala (host)
+function joinRoom() { OrbitNet.joinRoom(roomInput, myName, handleNet); } // entra pelo código
+function send(o) { OrbitNet.send(o); }
 
 function handleNet(msg) {
   switch (msg.t) {
+    case '_neterror': setLobbyMsg(msg.msg || 'Erro de rede.'); break;
     case 'joined': myNo = msg.playerNo; setLobbyMsg(`Entrou como Jogador ${myNo}. ${myNo === 1 ? 'Aguardando adversário...' : ''}`); break;
     case 'waiting': setLobbyMsg('Aguardando o segundo jogador entrar na sala...'); break;
     case 'full': setLobbyMsg('Sala cheia! Tente outro nome de sala.'); break;
     case 'start': oppName = msg.opponent || 'Adversário'; currentTurn = msg.startTurn; startGame(); break;
     case 'shot': {
-      const shot = { duration: msg.duration, segments: msg.segments, events: msg.events, finalBalls: msg.finalBalls };
+      const shot = { duration: msg.duration, segments: msg.segments, events: msg.events, cueSpeed: msg.cueSpeed, finalBalls: msg.finalBalls };
       if (phase === 'sim' && currentShot) shotQueue.push(shot); else startPlayback(shot);
       break;
     }
@@ -482,19 +503,17 @@ function screenToFelt(cx, cy) { // usado no toque
 function beginCharge() {
   if (ctrlCharging || !isLocked() || !(amShooter() && phase === 'aim' && !ballInHand)) return;
   ctrlCharging = true; chargePower = 0; chargeAccum = 0;
-  document.getElementById('powerWrap').classList.add('show');
+  setPowerUI(0);
 }
 function endCharge() {
   if (!ctrlCharging) return; ctrlCharging = false;
-  document.getElementById('powerWrap').classList.remove('show');
-  document.getElementById('powerFill').style.height = '0%';
+  setPowerUI(0);
   const pw = chargePower; chargePower = 0;
   if (pw > 0.05) shoot(pw);
 }
 function cancelCharge() {
   if (!ctrlCharging) return; ctrlCharging = false; chargePower = 0;
-  document.getElementById('powerWrap').classList.remove('show');
-  document.getElementById('powerFill').style.height = '0%';
+  setPowerUI(0);
 }
 
 // ---- Mouse (ponteiro sempre travado; Esc libera) --------------------------
@@ -527,17 +546,21 @@ function onMouseMove(e) {
   if (ctrlCharging) {
     chargeAccum += my; // puxar pra trás (mouse pra baixo/você) aumenta a força
     chargePower = Math.max(0, Math.min(1, chargeAccum / CHARGE_PX));
-    document.getElementById('powerFill').style.height = (chargePower * 100) + '%';
+    setPowerUI(chargePower);
     sendAim(); return;
   }
-  if (amShooter() && phase === 'aim') { setAim(aimAngle + mx * AIM_SENS); sendAim(); }
+  if (amShooter() && phase === 'aim') {
+    const sens = AIM_SENS * (window.OrbitSettings ? OrbitSettings.sensitivity() : 1);
+    setAim(aimAngle + mx * sens); sendAim();
+  }
 }
 function onMouseUp() {}
 function onKeyDown(e) {
+  if (window.OrbitMenu && OrbitMenu.isOpen()) return; // menu de pausa aberto
   if (e.key === 'Control' || e.ctrlKey) beginCharge();
   else if (e.key === 'Tab') { e.preventDefault(); topOverride = true; }
   else if (e.key === 'Shift') beginContact();
-  else if (e.key === 'h' || e.key === 'H') document.getElementById('keys').classList.toggle('collapsed');
+  else if (e.key === 'h' || e.key === 'H') toggleControls();
 }
 function onKeyUp(e) {
   if (e.key === 'Control') endCharge();
@@ -558,9 +581,23 @@ function endContact() {
   document.getElementById('contact').classList.remove('show');
 }
 function updateContactDot() {
-  const d = document.getElementById('contactDot');
-  d.style.left = (50 + (cueOffset.a / Physics.MAX_OFFSET) * 42) + '%';
-  d.style.top = (50 - (cueOffset.b / Physics.MAX_OFFSET) * 42) + '%';
+  const l = 50 + (cueOffset.a / Physics.MAX_OFFSET) * 42;
+  const t = 50 - (cueOffset.b / Physics.MAX_OFFSET) * 42;
+  const cd = document.getElementById('contactDot'); if (cd) { cd.style.left = l + '%'; cd.style.top = t + '%'; }
+  const ed = document.getElementById('effectDot'); if (ed) { ed.style.left = l + '%'; ed.style.top = t + '%'; }
+}
+// Abre/fecha o painel de controles (botão CONTROLES ou tecla H).
+function toggleControls() {
+  const k = document.getElementById('keys'), b = document.getElementById('ctrlBtn');
+  const hidden = k.classList.toggle('hidden');
+  b.classList.toggle('open', !hidden);
+}
+// Atualiza a barra de força (altura, marcador e número).
+function setPowerUI(p) {
+  const pct = Math.round(Math.max(0, Math.min(1, p)) * 100);
+  const f = document.getElementById('powerFill'); if (f) f.style.height = pct + '%';
+  const m = document.getElementById('powerMark'); if (m) m.style.bottom = pct + '%';
+  const t = document.getElementById('powerPct'); if (t) t.textContent = pct;
 }
 
 // ---- Toque (sem Ctrl): 1 dedo = puxar a branca; 2 dedos = girar ------------
@@ -570,7 +607,7 @@ function onTouchStart(e) {
   const t = e.touches[0]; lastMouse = { x: t.clientX, y: t.clientY };
   if (amShooter() && phase === 'aim') {
     if (ballInHand) { const f = screenToFelt(t.clientX, t.clientY); if (f && placeCue(f.x, f.y)) { ballInHand = false; sendCue(true); setStatus('Bola posicionada.'); } return; }
-    touchCharging = true; chargePower = 0; document.getElementById('powerWrap').classList.add('show'); return;
+    touchCharging = true; chargePower = 0; setPowerUI(0); return;
   }
   orbiting = true;
 }
@@ -578,13 +615,13 @@ function onTouchMove(e) {
   const t = e.touches[0]; const cur = { x: t.clientX, y: t.clientY };
   if (touchCharging) {
     const felt = screenToFelt(cur.x, cur.y);
-    if (felt) { const c = cue(); const dx = c.x - felt.x, dy = c.y - felt.y, d = Math.hypot(dx, dy); if (d > 3) { aimDir = { x: dx / d, y: dy / d }; chargePower = Math.max(0, Math.min(1, d / PULL_MAX)); } document.getElementById('powerFill').style.height = (chargePower * 100) + '%'; sendAim(); }
+    if (felt) { const c = cue(); const dx = c.x - felt.x, dy = c.y - felt.y, d = Math.hypot(dx, dy); if (d > 3) { aimDir = { x: dx / d, y: dy / d }; chargePower = Math.max(0, Math.min(1, d / PULL_MAX)); } setPowerUI(chargePower); sendAim(); }
     return;
   }
   lastMouse = cur; // câmera é automática (taco/topo); toque só mira/atira
 }
 function onTouchEnd() {
-  if (touchCharging) { touchCharging = false; document.getElementById('powerWrap').classList.remove('show'); document.getElementById('powerFill').style.height = '0%'; const pw = chargePower; chargePower = 0; if (pw > 0.05) shoot(pw); return; }
+  if (touchCharging) { touchCharging = false; setPowerUI(0); const pw = chargePower; chargePower = 0; if (pw > 0.05) shoot(pw); return; }
   orbiting = false;
 }
 let lastAimSent = 0;
@@ -607,7 +644,7 @@ function shoot(power) {
   cueOffset = { a: 0, b: 0 }; endContact(); updateContactDot(); // efeito reseta ao centro após a tacada
   const snapshot = balls.map((b) => ({ n: b.n, x: b.x, y: b.y, vx: b.vx, vy: b.vy, wx: b.wx, wy: b.wy, wz: b.wz, potted: b.potted }));
   const shot = Physics.simulateShot(snapshot);
-  send({ t: 'shot', segments: shot.segments, duration: shot.duration, events: shot.events, finalBalls: shot.finalBalls });
+  send({ t: 'shot', segments: shot.segments, duration: shot.duration, events: shot.events, cueSpeed: shot.cueSpeed, finalBalls: shot.finalBalls });
   startPlayback(shot);
 }
 
@@ -634,6 +671,8 @@ function hideAim() { aimLine.visible = false; cueStick.visible = false; ghostBal
 function updateAimVisuals() {
   const showMine = amShooter() && phase === 'aim' && !ballInHand;
   const showOpp = !amShooter() && phase === 'wait' && oppAim;
+  // Widgets de força e efeito só aparecem na sua vez de mirar.
+  document.getElementById('cueControls').classList.toggle('show', showMine);
   if (!showMine && !showOpp) { hideAim(); return; }
   const c = cue(); if (!c || c.potted) { hideAim(); return; }
   const dir = showMine ? aimDir : { x: Math.cos(oppAim.ang), y: Math.sin(oppAim.ang) };
@@ -655,27 +694,85 @@ function updateAimVisuals() {
 // ===========================================================================
 // HUD
 // ===========================================================================
-function setStatus(t) { document.getElementById('status').textContent = t; }
+// Linha de mensagem transitória (embaixo do banner): faltas, "bola posicionada" etc.
+function setStatus(t) { const e = document.getElementById('turnHint'); if (e) e.textContent = t || ''; }
 function setLobbyMsg(t) { document.getElementById('lobbyMsg').textContent = t; }
-function groupLabel(g) { return !g ? 'mesa aberta' : (g === 'solid' ? '● lisas' : '◐ listradas'); }
-function updateHUD() {
-  const n1 = myNo === 1 ? myName : oppName, n2 = myNo === 1 ? oppName : myName;
-  document.querySelector('#p1 .pn').textContent = n1 + (myNo === 1 ? ' (você)' : '');
-  document.querySelector('#p2 .pn').textContent = n2 + (myNo === 2 ? ' (você)' : '');
-  document.getElementById('p1').classList.toggle('active', currentTurn === 1);
-  document.getElementById('p2').classList.toggle('active', currentTurn === 2);
-  document.getElementById('p1g').textContent = groupLabel(game.groups[1]);
-  document.getElementById('p2g').textContent = groupLabel(game.groups[2]);
-  let s;
-  if (game.gameOver) s = game.lastMsg;
-  else if (currentTurn === myNo) {
-    if (ballInHand) s = 'Bola na mão — mova o cursor e clique no feltro para posicionar a branca.';
-    else if (!isLocked()) s = 'Sua vez! Clique na tela para travar o cursor (Esc libera).';
-    else s = 'Mova o mouse para girar o taco. Segure Ctrl e puxe o mouse para trás para dar força; solte o Ctrl para tacar.';
+
+// Cor de cada bola (lisas 1-7, listradas 9-15 repetem as cores).
+function ballColor(n) {
+  const base = n >= 9 ? n - 8 : n;
+  return ({ 1: '#f2c531', 2: '#2f6fd6', 3: '#d23b34', 4: '#7b3fa0', 5: '#e07a2f', 6: '#2f9e56', 7: '#8a3b2f', 8: '#141414' })[base] || '#999';
+}
+// Chips: mostra as 7 bolas do grupo; as já encaçapadas ficam apagadas (cinza).
+function buildChips(el, grp) {
+  el.innerHTML = '';
+  if (!grp) return;
+  const nums = grp === 'solid' ? [1, 2, 3, 4, 5, 6, 7] : [9, 10, 11, 12, 13, 14, 15];
+  for (const n of nums) {
+    const b = balls.find((x) => x.n === n);
+    const potted = !b || b.potted;
+    const c = document.createElement('div');
+    c.className = 'chip' + (potted ? ' potted' : '');
+    const col = ballColor(n);
+    c.style.background = grp === 'stripe'
+      ? `linear-gradient(to bottom, #f4f6f8 0 27%, ${col} 27% 73%, #f4f6f8 73%)`
+      : col;
+    el.appendChild(c);
   }
-  else s = `Vez de ${oppName}...`;
-  if (game.lastMsg && !game.gameOver) s = game.lastMsg + (currentTurn === myNo ? ' Sua vez!' : '');
-  setStatus(s);
+}
+// Barras da série no centro: vitórias do oponente (azul) + suas (verde) + resto.
+function buildDashes(oppNo) {
+  const el = document.getElementById('dashes'); el.innerHTML = '';
+  const ow = matchScore[oppNo] || 0, mw = matchScore[myNo] || 0;
+  for (let i = 0; i < SERIES_GAMES; i++) {
+    const d = document.createElement('i');
+    if (i < ow) d.style.background = '#3b82f6';
+    else if (i < ow + mw) d.style.background = '#34d399';
+    el.appendChild(d);
+  }
+}
+// Texto curto do banner (estado da vez / ação).
+function bannerText() {
+  if (game.gameOver) return game.winner === myNo ? 'VOCÊ VENCEU' : 'FIM DE JOGO';
+  if (currentTurn === myNo) {
+    if (ballInHand) return 'BOLA NA MÃO';
+    if (!isLocked()) return 'CLIQUE PARA MIRAR';
+    return 'SUA VEZ';
+  }
+  return 'VEZ DE ' + (oppName || 'ADVERSÁRIO').toUpperCase();
+}
+
+function updateHUD() {
+  const oppNo = myNo === 1 ? 2 : 1;
+  const meName = myName || ('Jogador ' + myNo);
+  const opName = oppName || ('Jogador ' + oppNo);
+  // Esquerda = oponente, direita = você (como no design).
+  document.getElementById('nmL').textContent = opName;
+  document.getElementById('nmR').textContent = meName;
+  document.getElementById('avL').textContent = (opName.trim().charAt(0) || 'A').toUpperCase();
+  document.getElementById('avR').textContent = (meName.trim().charAt(0) || 'V').toUpperCase();
+  const myTurn = currentTurn === myNo && !game.gameOver;
+  const opTurn = currentTurn === oppNo && !game.gameOver;
+  document.getElementById('plL').classList.toggle('turn', opTurn);
+  document.getElementById('plR').classList.toggle('turn', myTurn);
+  document.getElementById('dotL').classList.toggle('on', opTurn);
+  document.getElementById('dotR').classList.toggle('on', myTurn);
+
+  for (const [side, pl] of [['L', oppNo], ['R', myNo]]) {
+    const g = game.groups[pl];
+    const rem = g ? remainingOfGroup(g) : 0;
+    document.getElementById('grp' + side).textContent = !g ? 'mesa aberta' : (g === 'solid' ? ('lisas · ' + rem) : ('listradas · ' + rem));
+    buildChips(document.getElementById('chips' + side), g);
+  }
+
+  document.getElementById('sbSeries').textContent = 'MELHOR DE ' + SERIES_GAMES;
+  document.getElementById('scoreL').textContent = matchScore[oppNo];
+  document.getElementById('scoreR').textContent = matchScore[myNo];
+  buildDashes(oppNo);
+
+  document.getElementById('turnPill').classList.toggle('mine', myTurn);
+  document.getElementById('statusText').textContent = bannerText();
+  setStatus(game.gameOver ? '' : (game.lastMsg || ''));
 }
 
 // ===========================================================================
@@ -689,18 +786,35 @@ function startGame() {
   ballInHand = false; cueOffset = { a: 0, b: 0 }; currentShot = null; shotQueue = []; updateContactDot();
   setAim(0);
   phase = currentTurn === myNo ? 'aim' : 'wait';
+  if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   for (const b of balls) { const m = ballMeshes[b.n]; if (m) { m.quaternion.set(0, 0, 0, 1); m.position.set(b.x - W / 2, R, b.y - H / 2); m.visible = true; } }
   updateHUD();
 }
 function showEnd() {
+  // Conta a vitória na série (determinístico → os dois lados incrementam igual).
+  matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
+  matchOver = matchScore[game.winner] >= SERIES_TARGET;
   const won = game.winner === myNo;
-  document.getElementById('endTitle').textContent = won ? '🏆 Você venceu!' : '😞 Você perdeu';
-  document.getElementById('endMsg').textContent = game.lastMsg;
+  if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
+  const t = document.getElementById('endTitle'), m = document.getElementById('endMsg'), btn = document.getElementById('rematchBtn');
+  if (matchOver) {
+    t.textContent = won ? '🏆 Você venceu o melhor de 5!' : '😞 Você perdeu o melhor de 5';
+    m.textContent = `Placar final: ${matchScore[1]} – ${matchScore[2]}. ${game.lastMsg}`;
+    btn.textContent = 'Nova série';
+  } else {
+    t.textContent = won ? '🎉 Você venceu a partida!' : 'Você perdeu a partida';
+    m.textContent = `${game.lastMsg} Placar da série: ${matchScore[1]} – ${matchScore[2]}.`;
+    btn.textContent = 'Próxima partida';
+  }
   document.getElementById('rematchMsg').textContent = '';
   document.getElementById('endOverlay').classList.remove('hidden');
   phase = 'ended';
+  updateHUD();
 }
-function doRematch(initiator) { currentTurn = 1; if (initiator) send({ t: 'rematch' }); startGame(); }
+function doRematch(initiator) {
+  if (matchOver) { matchScore = { 1: 0, 2: 0 }; matchOver = false; } // fim da série → zera para a próxima
+  currentTurn = 1; if (initiator) send({ t: 'rematch' }); startGame();
+}
 
 // ===========================================================================
 // Loop
@@ -713,6 +827,7 @@ function loop(ts) {
     shotElapsed = Math.min(shotElapsed + dt, currentShot.duration);
     const states = Physics.evaluateShotAt(currentShot.segments, shotElapsed, balls);
     for (let i = 0; i < balls.length; i++) { balls[i].x = states[i].x; balls[i].y = states[i].y; balls[i].potted = states[i].potted; }
+    fireShotSounds();
     if (shotElapsed >= currentShot.duration) endShot();
   }
   syncMeshes();
@@ -729,6 +844,47 @@ function resize() {
 // ===========================================================================
 // Bind
 // ===========================================================================
+// Fundo 360° do bar: panorâmica equirretangular (2:1) em public/env/.
+// Em vez de um "céu no infinito" (que deixa o bar gigante e colado), mapeamos
+// a imagem numa ESFERA GRANDE em volta da mesa. Assim o bar fica longe, tem
+// parallax quando a câmera gira e parece uma sala de verdade (mais imersão).
+// BG_RADIUS controla o "tamanho da sala": maior = bar mais distante/menor.
+const BG_RADIUS = 6000;
+let bgSphere = null;
+function loadEnvironment() {
+  const CANDIDATES = ['env/bar.jpg', 'env/bar.jpeg', 'env/bar.png', 'env/bar.webp'];
+  const loader = new THREE.TextureLoader();
+  let i = 0;
+  (function tryNext() {
+    if (i >= CANDIDATES.length) return; // nenhum arquivo → segue com a cor atual
+    const url = CANDIDATES[i++];
+    loader.load(url, (tex) => {
+      if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+      // Esfera da "sala": vista por dentro (scale -1 em x evita espelhar).
+      const geo = new THREE.SphereGeometry(BG_RADIUS, 60, 40);
+      geo.scale(-1, 1, 1);
+      const mat = new THREE.MeshBasicMaterial({ map: tex });
+      if ('toneMapped' in mat) mat.toneMapped = false;
+      bgSphere = new THREE.Mesh(geo, mat);
+      bgSphere.position.set(0, 0, 0); // centrada na mesa
+      scene.add(bgSphere);
+      // Reflexos/iluminação do ambiente nas bolas (MeshStandardMaterial).
+      try {
+        tex.mapping = THREE.EquirectangularReflectionMapping;
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        pmrem.compileEquirectangularShader();
+        scene.environment = pmrem.fromEquirectangular(tex).texture;
+        scene.traverse((o) => {
+          if (o.isMesh && o !== bgSphere && o.material && 'envMapIntensity' in o.material) {
+            o.material.envMapIntensity = o.userData.shiny ? 0.8 : 0.3;
+            o.material.needsUpdate = true;
+          }
+        });
+      } catch (e) { /* PMREM indisponível: fica só o fundo */ }
+    }, undefined, () => tryNext()); // erro de carga → tenta a próxima extensão
+  })();
+}
+
 function init() {
   if (!initRenderer()) return; // sem WebGL: mostra aviso e não tenta montar a cena 3D
   // Usa o colisor extraído do modelo (contorno real das tabelas), se disponível.
@@ -737,6 +893,7 @@ function init() {
     console.log(ok ? 'Colisor do modelo 3D ativo.' : 'Colisor do modelo falhou; usando analítico.');
   }
   buildTable(); buildBalls(); buildAimHelpers();
+  loadEnvironment(); // fundo 360° do bar (se houver arquivo em env/)
   camPos.set(0, 780, 900); camLook.set(0, 0, 0);
   resize(); window.addEventListener('resize', resize);
 
@@ -753,12 +910,46 @@ function init() {
   canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onTouchMove(e); }, { passive: false });
   canvas.addEventListener('touchend', (e) => { e.preventDefault(); onTouchEnd(e); }, { passive: false });
 
-  document.getElementById('joinBtn').addEventListener('click', () => {
-    myName = (document.getElementById('name').value || 'Jogador').trim().slice(0, 20);
-    roomInput = (document.getElementById('room').value || 'sala1').trim().slice(0, 24);
-    setLobbyMsg('Conectando...'); connect();
+  const readName = () => (document.getElementById('name').value || 'Jogador').trim().slice(0, 20);
+  const lockInputs = () => { ['createBtn', 'joinBtn'].forEach((id) => { document.getElementById(id).disabled = true; }); };
+
+  if (window.OrbitMenu) {
+    OrbitMenu.init({
+      has3D: true,
+      canOpen: () => phase !== 'lobby',
+      onQuit: () => location.reload(),
+    });
+  }
+
+  document.getElementById('createBtn').addEventListener('click', () => {
+    if (window.OrbitAudio) OrbitAudio.unlock();
+    myName = readName();
+    roomInput = OrbitNet.makeCode();
+    document.getElementById('roomCodeVal').textContent = roomInput;
+    document.getElementById('roomShare').hidden = false;
+    lockInputs();
+    setLobbyMsg('Sala criada. Aguardando o adversário entrar com o código...');
+    hostRoom();
   });
+  document.getElementById('joinBtn').addEventListener('click', () => {
+    if (window.OrbitAudio) OrbitAudio.unlock();
+    const code = (document.getElementById('joinCode').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+    if (code.length < 3) { setLobbyMsg('Digite o código da sala que o host te enviou.'); return; }
+    myName = readName(); roomInput = code;
+    lockInputs();
+    setLobbyMsg('Conectando à sala ' + code + '...'); joinRoom();
+  });
+  document.getElementById('copyCodeBtn').addEventListener('click', () => {
+    const code = document.getElementById('roomCodeVal').textContent;
+    const btn = document.getElementById('copyCodeBtn');
+    const done = () => { btn.textContent = 'Copiado!'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done).catch(done);
+    else done();
+  });
+  document.getElementById('joinCode').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
+
   document.getElementById('rematchBtn').addEventListener('click', () => { document.getElementById('rematchMsg').textContent = 'Aguardando o adversário...'; doRematch(true); });
+  document.getElementById('ctrlBtn').addEventListener('click', toggleControls);
 
   requestAnimationFrame(loop);
 }

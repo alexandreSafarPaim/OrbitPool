@@ -78,6 +78,7 @@ let ws = null;
 // Tacada calculada de uma vez (event-based) + progresso da animação/playback.
 let currentShot = null;   // { duration, segments, events, finalBalls }
 let shotElapsed = 0;
+let soundCursor = 0;      // próximo evento sonoro ainda não tocado
 let shotQueue = [];       // tacadas recebidas enquanto ainda animo a anterior
 let cueOffset = { a: 0, b: 0 }; // efeito escolhido (lateral/vertical), reseta a cada tacada
 
@@ -232,7 +233,7 @@ function evaluateShot(ev) {
     game.lastMsg = legal
       ? `Bola 8 encaçapada! ${playerName(shooter)} venceu! 🏆`
       : `${playerName(shooter)} encaçapou a 8 fora de hora. ${playerName(opp)} venceu!`;
-    return { nextTurn: game.winner, ballInHand: false };
+    return { nextTurn: game.winner, ballInHand: false, foul };
   }
 
   // --- Definição de grupos (mesa aberta) ---
@@ -268,7 +269,7 @@ function evaluateShot(ev) {
     nextTurn = opp;
     if (!game.lastMsg) game.lastMsg = `Vez de ${playerName(opp)}.`;
   }
-  return { nextTurn, ballInHand: bih };
+  return { nextTurn, ballInHand: bih, foul };
 }
 
 function playerName(no) {
@@ -298,6 +299,7 @@ function loop(ts) {
     for (let i = 0; i < balls.length; i++) {
       balls[i].x = states[i].x; balls[i].y = states[i].y; balls[i].potted = states[i].potted;
     }
+    fireShotSounds();
     if (shotElapsed >= currentShot.duration) endShot();
   }
   render();
@@ -305,6 +307,19 @@ function loop(ts) {
 
 function amShooter() {
   return currentTurn === myNo && !game.gameOver;
+}
+
+// Dispara os efeitos sonoros conforme a animação passa por cada evento da
+// timeline (eventos vêm ordenados por tempo pelo motor de física).
+function fireShotSounds() {
+  if (!window.OrbitAudio || !currentShot || !currentShot.events) return;
+  const evs = currentShot.events;
+  while (soundCursor < evs.length && evs[soundCursor].t <= shotElapsed) {
+    const e = evs[soundCursor++];
+    if (e.type === 'contact') OrbitAudio.clack(e.v || 0);
+    else if (e.type === 'cushion') OrbitAudio.cushion(e.v || 0);
+    else if (e.type === 'pocket' || e.type === 'cuepotted') OrbitAudio.pocket();
+  }
 }
 
 // ===========================================================================
@@ -325,8 +340,11 @@ function startPlayback(shot) {
   shot.duration = Math.min(shot.duration, 30);
   currentShot = shot;
   shotElapsed = 0;
+  soundCursor = 0;
   phase = 'sim';
   oppAim = null;
+  // Som da tacada, no instante da batida (t=0).
+  if (window.OrbitAudio) OrbitAudio.cue(shot.cueSpeed || 900);
   updateHUD();
 }
 
@@ -344,6 +362,8 @@ function endShot() {
   const result = evaluateShot(deriveRuleEvents(shot.events));
   currentTurn = result.nextTurn;
   ballInHand = result.ballInHand;
+  // Jingle de falta (só se o jogo não acabou; fim tem seu próprio som).
+  if (result.foul && !game.gameOver && window.OrbitAudio) OrbitAudio.foul();
 
   // Reposiciona a branca se caiu
   if (cue().potted) {
@@ -365,28 +385,24 @@ function endShot() {
 // ===========================================================================
 // Rede
 // ===========================================================================
-function connect() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  ws = new WebSocket(`${proto}://${location.host}`);
-  ws.onopen = () => {
-    send({ t: 'join', room: roomInput, name: myName });
-  };
-  ws.onmessage = (e) => {
-    let msg;
-    try { msg = JSON.parse(e.data); } catch (_) { return; }
-    handleNet(msg);
-  };
-  ws.onclose = () => {
-    setLobbyMsg('Conexão encerrada. Recarregue a página.');
-  };
+function hostRoom() {
+  // Cria a sala (host / jogador 1). P2P por padrão; ?server usa WebSocket.
+  OrbitNet.hostRoom(roomInput, myName, handleNet);
+}
+function joinRoom() {
+  // Entra numa sala existente pelo código (jogador 2).
+  OrbitNet.joinRoom(roomInput, myName, handleNet);
 }
 
 function send(obj) {
-  if (ws && ws.readyState === 1) ws.send(JSON.stringify(obj));
+  OrbitNet.send(obj);
 }
 
 function handleNet(msg) {
   switch (msg.t) {
+    case '_neterror':
+      setLobbyMsg(msg.msg || 'Erro de rede.');
+      break;
     case 'joined':
       myNo = msg.playerNo;
       setLobbyMsg(`Entrou como Jogador ${myNo}. ${myNo === 1 ? 'Aguardando adversário...' : ''}`);
@@ -404,7 +420,7 @@ function handleNet(msg) {
       break;
     case 'shot': {
       // Recebe a timeline inteira já calculada por quem atirou; só reproduz.
-      const shot = { duration: msg.duration, segments: msg.segments, events: msg.events, finalBalls: msg.finalBalls };
+      const shot = { duration: msg.duration, segments: msg.segments, events: msg.events, cueSpeed: msg.cueSpeed, finalBalls: msg.finalBalls };
       // Se AINDA estou animando a tacada anterior (o adversário potou e jogou de
       // novo antes de eu terminar a animação), NÃO posso sobrescrever a tacada
       // atual — senão eu pularia o endShot dela e perderia a atualização de
@@ -506,7 +522,7 @@ function pointerUp() {
 
   const snapshot = balls.map((b) => ({ n: b.n, x: b.x, y: b.y, vx: b.vx, vy: b.vy, wx: b.wx, wy: b.wy, wz: b.wz, potted: b.potted }));
   const shot = Physics.simulateShot(snapshot);
-  send({ t: 'shot', segments: shot.segments, duration: shot.duration, events: shot.events, finalBalls: shot.finalBalls });
+  send({ t: 'shot', segments: shot.segments, duration: shot.duration, events: shot.events, cueSpeed: shot.cueSpeed, finalBalls: shot.finalBalls });
   startPlayback(shot); // mesmo guard de duração finita do lado que recebe
   updateHUD();
 }
@@ -901,12 +917,14 @@ function startGame() {
   currentShot = null;
   shotQueue = [];
   phase = currentTurn === myNo ? 'aim' : 'wait';
+  if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   resize();
   updateHUD();
 }
 
 function showEnd() {
   const won = game.winner === myNo;
+  if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
   document.getElementById('endTitle').textContent = won ? '🏆 Você venceu!' : '😞 Você perdeu';
   document.getElementById('endMsg').textContent = game.lastMsg;
   document.getElementById('rematchMsg').textContent = '';
@@ -924,16 +942,66 @@ function doRematch(initiator) {
 // ===========================================================================
 // Bind de eventos
 // ===========================================================================
+function readName() { return (document.getElementById('name').value || 'Jogador').trim().slice(0, 20); }
+function lockLobbyInputs() {
+  document.getElementById('createBtn').disabled = true;
+  document.getElementById('joinBtn').disabled = true;
+}
+
+document.getElementById('createBtn').addEventListener('click', () => {
+  if (window.OrbitAudio) OrbitAudio.unlock();
+  myName = readName();
+  roomInput = OrbitNet.makeCode();
+  // Mostra o código para o host compartilhar
+  document.getElementById('roomCodeVal').textContent = roomInput;
+  document.getElementById('roomShare').hidden = false;
+  lockLobbyInputs();
+  setLobbyMsg('Sala criada. Aguardando o adversário entrar com o código...');
+  hostRoom();
+});
+
 document.getElementById('joinBtn').addEventListener('click', () => {
-  myName = (document.getElementById('name').value || 'Jogador').trim().slice(0, 20);
-  roomInput = (document.getElementById('room').value || 'sala1').trim().slice(0, 24);
-  setLobbyMsg('Conectando...');
-  connect();
+  if (window.OrbitAudio) OrbitAudio.unlock();
+  const code = (document.getElementById('joinCode').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length < 3) { setLobbyMsg('Digite o código da sala que o host te enviou.'); return; }
+  myName = readName();
+  roomInput = code;
+  lockLobbyInputs();
+  setLobbyMsg('Conectando à sala ' + code + '...');
+  joinRoom();
+});
+
+document.getElementById('copyCodeBtn').addEventListener('click', () => {
+  const code = document.getElementById('roomCodeVal').textContent;
+  const btn = document.getElementById('copyCodeBtn');
+  const done = () => { btn.textContent = 'Copiado!'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1500); };
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done).catch(done);
+  else done();
+});
+
+document.getElementById('joinCode').addEventListener('input', (e) => {
+  e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
 });
 
 document.getElementById('rematchBtn').addEventListener('click', () => {
   document.getElementById('rematchMsg').textContent = 'Aguardando o adversário...';
   doRematch(true);
+});
+
+// Mudo (botão + tecla M)
+function updateMuteBtn() {
+  const b = document.getElementById('muteBtn'); if (!b) return;
+  const m = window.OrbitAudio && OrbitAudio.isMuted();
+  b.textContent = m ? '🔇' : '🔊';
+}
+document.getElementById('muteBtn').addEventListener('click', () => {
+  if (window.OrbitAudio) { OrbitAudio.unlock(); OrbitAudio.toggleMute(); }
+  updateMuteBtn();
+});
+window.addEventListener('keydown', (e) => {
+  const t = e.target;
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return; // não interferir na digitação
+  if ((e.key === 'm' || e.key === 'M') && window.OrbitAudio) { OrbitAudio.toggleMute(); updateMuteBtn(); }
 });
 
 // Ponteiro (mouse + touch)
@@ -944,8 +1012,16 @@ canvas.addEventListener('touchstart', (e) => { e.preventDefault(); pointerDown(e
 canvas.addEventListener('touchmove', (e) => { e.preventDefault(); pointerMove(e); }, { passive: false });
 canvas.addEventListener('touchend', (e) => { e.preventDefault(); pointerUp(e); }, { passive: false });
 
+// Menu de pausa (ESC): Continuar / Configurações / Sair. Sair recarrega (cai no lobby).
+if (window.OrbitMenu) {
+  OrbitMenu.init({
+    has3D: false,
+    canOpen: () => phase !== 'lobby',
+    onQuit: () => location.reload(),
+  });
+}
+
 // Pré-preenche campos
 document.getElementById('name').value = '';
-document.getElementById('room').value = 'sala1';
 
 requestAnimationFrame(loop);

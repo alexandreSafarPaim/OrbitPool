@@ -21,6 +21,10 @@ const MIME = {
   '.css': 'text/css; charset=utf-8',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.mp3': 'audio/mpeg',
+  '.wav': 'audio/wav',
+  '.ogg': 'audio/ogg',
+  '.obj': 'text/plain; charset=utf-8',
 };
 
 // ---------------------------------------------------------------------------
