@@ -791,6 +791,7 @@ function startGame() {
   maybeBotTurn();
 }
 function showEnd() {
+  exitLock(); // libera o cursor na hora (pra clicar no overlay de fim de jogo)
   // Conta a vitória na série (determinístico → os dois lados incrementam igual).
   matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
   matchOver = matchScore[game.winner] >= SERIES_TARGET;
