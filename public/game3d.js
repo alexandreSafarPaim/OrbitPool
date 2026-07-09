@@ -314,14 +314,23 @@ let camPos = new THREE.Vector3(0, 1250, 320);
 const camLook = new THREE.Vector3(0, 0, 0);
 let topOverride = false;   // Tab segurado
 let zoom = 1;
+// Elevação da câmera na visão do taco (mouse Y na mira): 0 = rente à mesa,
+// 1 = quase de cima. SÓ VISUAL — não altera mira, força nem efeito.
+let camPitch = 0.48; // equivale à visão padrão anterior (back 360, altura 300)
+const PITCH_SENS = 0.0022; // por pixel de mouse
+const ELEV_MIN = 0.07, ELEV_MAX = 1.35; // rad
 
 function cueView() { return amShooter() && phase === 'aim' && !topOverride && !ballInHand; }
 function updateCamera(dt) {
   let desired, look;
   if (cueView() && cue() && !cue().potted) {
     const c = cue(), d = aimDir;
-    const back = (360 + chargePower * 140) * zoom;
-    desired = new THREE.Vector3(c.x - W / 2 - d.x * back, (300 + chargePower * 60) * zoom, c.y - H / 2 - d.y * back);
+    // Órbita vertical: distância constante, elevação controlada por camPitch.
+    const dist = (470 + chargePower * 155) * zoom;
+    const elev = ELEV_MIN + camPitch * (ELEV_MAX - ELEV_MIN);
+    const back = Math.cos(elev) * dist;
+    const height = Math.max(Math.sin(elev) * dist, 3 * R); // nunca abaixo do rail
+    desired = new THREE.Vector3(c.x - W / 2 - d.x * back, height, c.y - H / 2 - d.y * back);
     look = new THREE.Vector3(c.x - W / 2 + d.x * 160, 0, c.y - H / 2 + d.y * 160);
   } else {
     desired = new THREE.Vector3(0, 1250 * zoom, 300 * zoom); // vista de cima (leve inclinação)
@@ -557,7 +566,11 @@ function onMouseMove(e) {
   }
   if (amShooter() && phase === 'aim') {
     const sens = AIM_SENS * (window.OrbitSettings ? OrbitSettings.sensitivity() : 1);
-    setAim(aimAngle + mx * sens); sendAim();
+    setAim(aimAngle + mx * sens);
+    // Mouse Y: eleva/abaixa o ponto de vista (mouse p/ cima = ver de cima,
+    // p/ baixo = rente à mesa). Só câmera — a tacada não muda.
+    camPitch = Math.max(0, Math.min(1, camPitch - my * PITCH_SENS));
+    sendAim();
   }
 }
 function onMouseUp() {}
@@ -917,7 +930,52 @@ function resize() {
 // BG_RADIUS controla o "tamanho da sala": maior = bar mais distante/menor.
 const BG_RADIUS = 6000;
 let bgSphere = null;
+
+// Aplica a intensidade dos reflexos do ambiente nos materiais da cena.
+function applyEnvIntensity() {
+  scene.traverse((o) => {
+    if (o.isMesh && o !== bgSphere && o.material && 'envMapIntensity' in o.material) {
+      o.material.envMapIntensity = o.userData.shiny ? 0.8 : 0.3;
+      o.material.needsUpdate = true;
+    }
+  });
+}
+
+// Ordem de preferência: 1) CUBEMAP em env/cube/{px,nx,py,ny,pz,nz}.png
+// (maior qualidade), 2) idem .jpg, 3) panorâmica equirretangular env/bar.*.
 function loadEnvironment() {
+  loadCubeEnv('png', () => loadCubeEnv('jpg', () => loadEquirectEnv()));
+}
+
+// Cubemap: a "sala" continua sendo uma esfera grande (parallax quando a câmera
+// anda), mas amostrando o cubemap POR DIREÇÃO num shader — textureCube garante
+// a orientação correta das 6 faces, sem precisar espelhar geometria.
+function loadCubeEnv(ext, onFail) {
+  const files = ['px', 'nx', 'py', 'ny', 'pz', 'nz'].map((f) => 'env/cube/' + f + '.' + ext);
+  new THREE.CubeTextureLoader().load(files, (tex) => {
+    if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+    const geo = new THREE.SphereGeometry(BG_RADIUS, 48, 24);
+    const mat = new THREE.ShaderMaterial({
+      uniforms: { env: { value: tex } },
+      vertexShader: 'varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }',
+      // Saída direta (sRGB → sRGB): equivale ao toneMapped=false da panorâmica.
+      fragmentShader: 'uniform samplerCube env; varying vec3 vDir; void main(){ gl_FragColor = textureCube(env, normalize(vDir)); }',
+      side: THREE.BackSide, depthWrite: false, fog: false,
+    });
+    bgSphere = new THREE.Mesh(geo, mat);
+    bgSphere.position.set(0, 0, 0); // centrada na mesa
+    scene.add(bgSphere);
+    // Reflexos/iluminação do ambiente nas bolas (MeshStandardMaterial).
+    try {
+      const pmrem = new THREE.PMREMGenerator(renderer);
+      pmrem.compileCubemapShader();
+      scene.environment = pmrem.fromCubemap(tex).texture;
+      applyEnvIntensity();
+    } catch (e) { /* PMREM indisponível: fica só o fundo */ }
+  }, undefined, onFail);
+}
+
+function loadEquirectEnv() {
   const CANDIDATES = ['env/bar.jpg', 'env/bar.jpeg', 'env/bar.png', 'env/bar.webp'];
   const loader = new THREE.TextureLoader();
   let i = 0;
@@ -940,12 +998,7 @@ function loadEnvironment() {
         const pmrem = new THREE.PMREMGenerator(renderer);
         pmrem.compileEquirectangularShader();
         scene.environment = pmrem.fromEquirectangular(tex).texture;
-        scene.traverse((o) => {
-          if (o.isMesh && o !== bgSphere && o.material && 'envMapIntensity' in o.material) {
-            o.material.envMapIntensity = o.userData.shiny ? 0.8 : 0.3;
-            o.material.needsUpdate = true;
-          }
-        });
+        applyEnvIntensity();
       } catch (e) { /* PMREM indisponível: fica só o fundo */ }
     }, undefined, () => tryNext()); // erro de carga → tenta a próxima extensão
   })();
