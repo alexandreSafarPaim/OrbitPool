@@ -145,6 +145,7 @@ window.OrbitBot = (function () {
   // Decisão principal.
   function decide(state) {
     const L = LEVELS[state.level] || LEVELS.amador;
+    const deadline = Date.now() + 1300; // orçamento total da decisão (ms)
     const balls = state.balls;
     let cue = balls.find((b) => b.n === 0) || { x: W * 0.25, y: H / 2 };
     let place = null;
@@ -163,13 +164,13 @@ window.OrbitBot = (function () {
       let bestPos = cand[0], bestv = -Infinity;
       for (const c of cand) {
         if (balls.some((b) => b.n !== 0 && !b.potted && hyp(b.x - c.x, b.y - c.y) < 2 * R + 2)) continue;
-        const d = bestFrom(balls, c, state, L, true);
+        const d = bestFrom(balls, c, state, L, true, deadline);
         if (d && d.score > bestv) { bestv = d.score; bestPos = c; }
       }
       place = bestPos; cue = { n: 0, x: bestPos.x, y: bestPos.y, potted: false };
     }
 
-    const best = bestFrom(balls, cue, state, L, false);
+    const best = bestFrom(balls, cue, state, L, false, deadline);
     let ang = best.ang, power = best.power, a = best.a, b = best.b;
 
     // Ruído de execução conforme o nível (mesmo um bom plano pode falhar).
@@ -183,11 +184,16 @@ window.OrbitBot = (function () {
   }
 
   // Melhor tacada a partir de uma posição de branca (sem ruído de execução).
-  function bestFrom(balls, cue, state, L, quick) {
+  // deadline: orçamento de tempo (ms, Date.now()) — com colisor de malha a
+  // simulação fica mais cara; ao estourar, decide com o que já foi avaliado.
+  function bestFrom(balls, cue, state, L, quick, deadline) {
+    const over = () => deadline && Date.now() > deadline;
     const ctx = { group: state.group, open: state.open, legalFirst: legalFirstSet(balls, state.group, state.open), posW: L.posW };
     const cand = [];
+    outer:
     for (const T of targets(balls, state.group, state.open)) {
       for (const p of POCKETS()) {
+        if (over() && cand.length) break outer;
         const dxp = p.x - T.x, dyp = p.y - T.y, dop = hyp(dxp, dyp) || 1;
         const gx = T.x - (dxp / dop) * 2 * R, gy = T.y - (dyp / dop) * 2 * R; // ghost ball
         const dxc = gx - cue.x, dyc = gy - cue.y, dcg = hyp(dxc, dyc) || 1;
@@ -216,12 +222,15 @@ window.OrbitBot = (function () {
     if (!quick && L.mc > 0) {
       for (const c of cand.slice(0, 3)) {
         if (c.score <= 0) continue; // multiplicar score negativo o deixaria MENOS negativo (melhor) — errado
-        let pots = 0;
+        if (over()) break;
+        let pots = 0, ran = 0;
         for (let i = 0; i < L.mc; i++) {
+          if (over()) break;
+          ran++;
           const sc = scoreShot(balls, cue, c.T, c.ang + gauss(L.sigmaAng), c.power + gauss(L.sigmaPow * 0.5), c.a, c.b, ctx);
           if (sc && sc.tPotted && sc.score > 0) pots++;
         }
-        c.score = c.score * (0.35 + 0.65 * (pots / L.mc)); // pondera pela robustez
+        if (ran > 0) c.score = c.score * (0.35 + 0.65 * (pots / ran)); // pondera pela robustez
       }
       cand.sort((x, y) => y.score - x.score);
     }

@@ -15,8 +15,13 @@
 'use strict';
 
 // ---- Dimensões do mundo (compartilhadas com o render em game.js) ----------
-const W = 900;
-const H = 450;
+// Campo NATIVO do modelo GLB "Billiard Table" (Futurealiti, CC-BY-4.0).
+// Medido na BORRACHA das almofadas (não na madeira!), na banda de contato da
+// bola e com correção da inclinação da face: linha de parada do CENTRO da
+// bola a ±1.1724m × ±0.5670m ⇒ borda física (centro+R) abaixo. Escala
+// 354.331 unid/m (= 9 unid/polegada — física inalterada).
+const W = 850.4;         // comprimento entre paredes efetivas
+const H = 421.4;         // largura — proporção 2.018:1 (mesa 2:1 real!)
 const RAIL = 34;
 const R = 9.8;
 const POCKET = 21;
@@ -53,7 +58,7 @@ const Physics = (function () {
   // Jaws/chanfros da CAÇAPA: o facing (couro/borracha) absorve muito mais que
   // a almofada — numa mesa real a bola que bate na boca MORRE e cai, não é
   // cuspida de volta. Restituição e tangencial bem menores que as da tabela.
-  const REST_JAW_BASE = 0.55;
+  const REST_JAW_BASE = 0.47;
   const JAW_TANGENT_FACTOR = 0.76;
   const JAW_WZ_RETAIN = 0.5;
 
@@ -71,15 +76,21 @@ const Physics = (function () {
   // CENTRO dela entra no círculo de captura da caçapa (i.e., quando o centro
   // de gravidade passa sobre o buraco). Assim ela pode bater no chanfro,
   // desviar e até chacoalhar de um lado ao outro e voltar pra mesa (rattle).
-  const CT = 34;          // distância da caçapa de CANTO até a ponta do rail
-  const MT = 27;          // distância da caçapa do MEIO até a ponta do rail
+  // Geometria das bocas MEDIDA na borracha do modelo GLB (banda de contato):
+  // CT visual medido ≈ 20, mas a boca de canto do modelo é justa (10cm = 1.8
+  // diâmetros). +5 de tolerância invisível por lado para não ficar punitiva
+  // (a bola sobrepõe ~1.4cm da ponta desenhada ao entrar — imperceptível).
+  const CT = 25;
+  const MT = 26.5;        // meia-boca do meio (vão visual = 53.2 ≈ 15 cm — generosa)
   const CHF = 18;         // comprimento (projetado) do chanfro
-  // Captura = a bola cai só quando o CENTRO dela passa sobre o buraco. Raios
-  // menores que a diagonal do rail (R√2) e centros empurrados para dentro do
-  // buraco evitam "sugar" bolas que só passam rente ao rail.
-  const CAP_CORNER = 14;  // raio de captura da caçapa de canto
-  const CAP_MID = 11;     // raio de captura da caçapa do meio
-  const PD = 6;           // quanto o centro da caçapa fica para dentro do buraco
+  // Captura = a bola cai só quando o CENTRO dela passa sobre o buraco.
+  // Centros ≈ furos reais do modelo (canto ~7.5 unid. ALÉM do vértice, na
+  // diagonal; meio ~13 além do nariz). Conferido: bola rolando rente ao rail
+  // (centro a R=9.8 da parede) passa a >2 unid. de qualquer captura.
+  const CAP_CORNER = 17;  // raio de captura da caçapa de canto
+  const CAP_MID = 14;     // raio de captura da caçapa do meio
+  const COUT = 6;         // furo do canto: centro além do vértice (diagonal)
+  const PD = 13;          // furo do meio: centro além da linha do nariz
   const XL = R, XR = W - R, YT = R, YB = H - R;   // linhas de contato dos rails
   const MX = W / 2;
 
@@ -89,7 +100,13 @@ const Physics = (function () {
     const ux = dx / L, uy = dy / L;
     let nx = -uy, ny = ux;
     if ((refx - ax) * nx + (refy - ay) * ny < 0) { nx = -nx; ny = -ny; }
-    return { ax, ay, bx, by, ux, uy, L, nx, ny };
+    return withBBox({ ax, ay, bx, by, ux, uy, L, nx, ny });
+  }
+  // BBox do segmento (pré-filtro de alcance: pula paredes inalcançáveis).
+  function withBBox(s) {
+    s.minx = Math.min(s.ax, s.bx); s.maxx = Math.max(s.ax, s.bx);
+    s.miny = Math.min(s.ay, s.by); s.maxy = Math.max(s.ay, s.by);
+    return s;
   }
   const CX = MX, CY = H / 2; // centro da mesa (referência de "para dentro")
 
@@ -127,31 +144,33 @@ const Physics = (function () {
   let ALL_WALLS = SEGMENTS.concat(CHAMFERS);
   let customTable = false; // true quando um colisor de modelo é carregado
 
-  // Pontas dos rails (jaws) — cantos convexos que a bola toca e ricocheteia.
-  let TIPS = [
-    { x: CT, y: 0 }, { x: 0, y: CT }, { x: W - CT, y: 0 }, { x: W, y: CT },
-    { x: CT, y: H }, { x: 0, y: H - CT }, { x: W - CT, y: H }, { x: W, y: H - CT },
-    { x: MX - MT, y: 0 }, { x: MX + MT, y: 0 }, { x: MX - MT, y: H }, { x: MX + MT, y: H },
-  ];
+  // Pontas convexas (tips) — usadas SÓ por colisores de modelo (setTable).
+  // Na geometria analítica rail e chanfro são CONTÍNUOS no mesmo vértice, e os
+  // antigos tips em (CT,0)/(MX±MT,0) tangenciavam exatamente a linha de
+  // rolagem rente ao rail: bola indo pro canto batia numa "paredinha
+  // invisível" na entrada da boca. Removidos.
+  let TIPS = [];
 
   // Círculos de captura (a bola cai quando o CENTRO entra aqui).
-  const PDc = PD * Math.SQRT1_2; // componente diagonal para os cantos
   let PCAPS = [
-    { x: -PDc, y: -PDc, cap: CAP_CORNER }, { x: MX, y: -PD, cap: CAP_MID }, { x: W + PDc, y: -PDc, cap: CAP_CORNER },
-    { x: -PDc, y: H + PDc, cap: CAP_CORNER }, { x: MX, y: H + PD, cap: CAP_MID }, { x: W + PDc, y: H + PDc, cap: CAP_CORNER },
+    { x: -COUT, y: -COUT, cap: CAP_CORNER }, { x: MX, y: -PD, cap: CAP_MID }, { x: W + COUT, y: -COUT, cap: CAP_CORNER },
+    { x: -COUT, y: H + COUT, cap: CAP_CORNER }, { x: MX, y: H + PD, cap: CAP_MID }, { x: W + COUT, y: H + COUT, cap: CAP_CORNER },
   ];
 
   // Substitui a geometria de colisão pelo contorno de um modelo (3D). geom =
-  // { segments:[[ax,ay,bx,by,nx,ny],...], pockets:[{x,y,cap},...] }.
+  // { segments:[[ax,ay,bx,by,nx,ny,jaw?],...], pockets:[{x,y,cap},...],
+  //   tips:[{x,y},...] } — tips = pontas convexas (bocas) p/ a bola ricochetear.
   function setTable(geom) {
     try {
       const ws = geom.segments.map((s) => {
         const ax = s[0], ay = s[1], bx = s[2], by = s[3];
         let dx = bx - ax, dy = by - ay; const L = Math.hypot(dx, dy) || 1e-9;
-        return { ax, ay, bx, by, ux: dx / L, uy: dy / L, L, nx: s[4], ny: s[5] };
+        return withBBox({ ax, ay, bx, by, ux: dx / L, uy: dy / L, L, nx: s[4], ny: s[5], jaw: !!s[6] });
       });
       if (!ws.length || !geom.pockets || !geom.pockets.length) return false;
-      ALL_WALLS = ws; TIPS = []; PCAPS = geom.pockets.map((p) => ({ x: p.x, y: p.y, cap: p.cap || 15 }));
+      ALL_WALLS = ws;
+      TIPS = (geom.tips || []).map((t) => ({ x: t.x, y: t.y }));
+      PCAPS = geom.pockets.map((p) => ({ x: p.x, y: p.y, cap: p.cap || 15 }));
       customTable = true;
       return true;
     } catch (e) { return false; }
@@ -480,8 +499,10 @@ const Physics = (function () {
     const vt = b.vx * tx + b.vy * ty;
     const vnMps = Math.abs(vn) * WORLD_TO_MPS;
     // Jaw (boca da caçapa): facing absorvente — rebote morto p/ a bola cair.
+    // No jaw a restituição CAI FORTE com a velocidade (couro/borracha da boca
+    // engole tacadas rápidas — evita o rattle irreal cuspir a bola de volta).
     const e = jaw
-      ? Math.max(0.28, REST_JAW_BASE - REST_RAIL_VEL_DROP * vnMps)
+      ? Math.max(0.22, REST_JAW_BASE - 0.09 * vnMps)
       : Math.min(0.90, Math.max(0.65, REST_RAIL_BASE - REST_RAIL_VEL_DROP * vnMps));
     const CUSHION_TANGENT = jaw ? JAW_TANGENT_FACTOR : CUSHION_TANGENT_FACTOR;
     const WZ_RETAIN = jaw ? JAW_WZ_RETAIN : CUSHION_WZ_RETAIN;
@@ -523,13 +544,20 @@ const Physics = (function () {
   }
 
   // Calcula v/ω iniciais da bola branca a partir de (power,aimDir,a,b).
+  // Penalidade de velocidade por tacar fora do centro. O valor FÍSICO exato é
+  // 2.5 (= 5/2: energia vira spin), mas na prática o jogador real compensa
+  // tacando mais forte — com 2.5 o draw máximo saía 32% mais lento e chegava
+  // com ~1/3 da velocidade (reclamação geral). 1.2 = meio-termo: ainda há
+  // custo por efeito (realismo), sem esvaziar a tacada.
+  const SPIN_SPEED_TAX = 1.2;
+
   function cueStrike(power, aimDir, a, b) {
     if (Math.hypot(a, b) > MAX_OFFSET) return { miscue: true };
     const offset2 = a * a + b * b;
     // V0 equivalente calibrado para que uma tacada central (a=b=0) reproduza
     // exatamente `power*MAX_SHOT`, preservando a sensação de jogo já calibrada.
     const V0 = (power * MAX_SHOT) * (1 + CUE_MASS_RATIO) / 2;
-    const speed = (2 * V0) / (1 + CUE_MASS_RATIO + 2.5 * offset2);
+    const speed = (2 * V0) / (1 + CUE_MASS_RATIO + SPIN_SPEED_TAX * offset2);
 
     const dir = squirtedDir(aimDir, a);
     const tHatX = -dir.y, tHatY = dir.x; // ẑ × d̂ (eixo horizontal do topspin/backspin)
@@ -584,6 +612,17 @@ const Physics = (function () {
       let bestT = Infinity, bestEvent = null;
       const coeffs = cur.map(motionCoeffs);
 
+      // ALCANCE de cada bola: distância máx. que ela ainda percorre até parar
+      // (limite superior seguro: v + (2/7)|u| cobre draw/backspin que acelera
+      // após reverter). Pré-filtro barato que evita resolver polinômios para
+      // geometria inalcançável — essencial com colisores de malha (100+ segs).
+      const reach = cur.map((b) => {
+        if (b.potted || b.phase === 'stopped') return 0;
+        const u = slipVector(b.vx, b.vy, b.wx, b.wy);
+        const vmax = Math.hypot(b.vx, b.vy) + (2 / 7) * Math.hypot(u.x, u.y);
+        return (vmax * vmax) / (2 * MU_ROLL * G) + 6;
+      });
+
       for (let i = 0; i < n; i++) {
         if (cur[i].potted || cur[i].phase === 'stopped') continue;
         const t = transitionTime(cur[i]);
@@ -591,14 +630,21 @@ const Physics = (function () {
       }
       for (let i = 0; i < n; i++) {
         if (cur[i].potted || cur[i].phase === 'stopped') continue;
+        const bi = cur[i], ri = reach[i];
         // Rails e chanfros (segmentos) — seguram o centro da bola em toda a
         // volta, MENOS nas bocas das caçapas.
         for (const seg of ALL_WALLS) {
+          const ddx = Math.max(seg.minx - bi.x, 0, bi.x - seg.maxx);
+          const ddy = Math.max(seg.miny - bi.y, 0, bi.y - seg.maxy);
+          if (ddx * ddx + ddy * ddy > ri * ri) continue; // inalcançável
           const t = segTime(coeffs[i], seg);
           if (t < bestT) { bestT = t; bestEvent = { type: 'wall', i, seg }; }
         }
         // Pontas dos rails (jaws) — colisão com o vértice.
         for (const tip of TIPS) {
+          const dtx = tip.x - bi.x, dty = tip.y - bi.y;
+          const lim = ri + R;
+          if (dtx * dtx + dty * dty > lim * lim) continue;
           const phantom = { x0: tip.x, y0: tip.y, vx0: 0, vy0: 0, ax: 0, ay: 0 };
           const t = approachTime(coeffs[i], phantom, R);
           if (t < bestT) { bestT = t; bestEvent = { type: 'tip', i, tip }; }
@@ -607,6 +653,9 @@ const Physics = (function () {
         // centro passa sobre o buraco — como numa mesa real, onde ela despenca
         // na boca em vez de precisar viajar até o fundo da garganta.
         for (const p of PCAPS) {
+          const dpx = p.x - bi.x, dpy = p.y - bi.y;
+          const lim = ri + p.cap;
+          if (dpx * dpx + dpy * dpy > lim * lim) continue;
           const t = approachTime(coeffs[i], { x0: p.x, y0: p.y, vx0: 0, vy0: 0, ax: 0, ay: 0 }, p.cap);
           if (t < bestT) { bestT = t; bestEvent = { type: 'escape', i }; }
         }
@@ -631,6 +680,9 @@ const Physics = (function () {
         for (let j = i + 1; j < n; j++) {
           if (cur[j].potted) continue;
           if (cur[i].phase === 'stopped' && cur[j].phase === 'stopped') continue;
+          const dbx = cur[j].x - cur[i].x, dby = cur[j].y - cur[i].y;
+          const lim = reach[i] + reach[j] + 2 * R;
+          if (dbx * dbx + dby * dby > lim * lim) continue; // par inalcançável
           const t = approachTime(coeffs[i], coeffs[j], 2 * R);
           if (t < bestT) { bestT = t; bestEvent = { type: 'ballball', i, j }; }
         }

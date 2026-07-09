@@ -138,30 +138,48 @@ function buildTable() {
   tryLoadModel();          // tenta trocar pelo modelo 3D externo
 }
 
-// Carrega o modelo OBJ (assets → public/pooltable.obj) e o alinha à física:
-// as caçapas do modelo (X±71, Z±35.5) mapeiam na área de jogo (±450, ±225),
-// e o feltro (Y≈32.4) vai para y=0. Se falhar, mantém a mesa procedural.
+// Carrega o modelo GLB "Billiard Table" (Futurealiti, sketchfab.com — CC-BY-4.0)
+// em PROPORÇÃO NATIVA: a física (W=879.8 × H=449.3) já foi medida dos narizes
+// das tabelas deste modelo, então a escala é UNIFORME (354.331 unid/m = 9/pol)
+// e nada fica distorcido. Tacos e bolas embutidos no modelo são ocultados.
+// Se falhar, mantém a mesa procedural.
 function tryLoadModel() {
-  if (!window.THREE || !THREE.OBJLoader) return;
+  if (!window.THREE || !THREE.GLTFLoader) return;
   let loader;
-  try { loader = new THREE.OBJLoader(); } catch (e) { return; }
-  loader.load('pooltable.obj', (obj) => {
-    const tex = new THREE.TextureLoader().load('pooltable_tex.png');
-    if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
-    obj.traverse((c) => {
-      if (c.isMesh) {
-        c.material = new THREE.MeshStandardMaterial({ map: tex, roughness: 0.85, metalness: 0.1 });
-        c.castShadow = true; c.receiveShadow = true;
+  try { loader = new THREE.GLTFLoader(); } catch (e) { return; }
+  loader.load('table.glb', (gltf) => {
+    const root = gltf.scene;
+    // Constantes MEDIDAS do modelo (metros): centro do campo (linhas de parada
+    // do centro da bola na BORRACHA das almofadas) e topo do feltro.
+    const S = 354.331;                 // unidades de física por metro
+    const X0 = -0.00175, Z0 = 0.00165; // centro do campo no modelo
+    const FELT_Y = 0.7794;             // topo do feltro (as bolas assentam aqui)
+    root.traverse((o) => {
+      if (o.name === 'CueSticks' || o.name === 'BilliardBalls') o.visible = false;
+      if (o.isMesh && o.material) {
+        o.castShadow = true; o.receiveShadow = true;
+        const mt = o.material;
+        if (/metal/i.test(o.name) || /lambert/i.test(mt.name || '')) {
+          // aros/metal das caçapas: brilho moderado
+          if ('metalness' in mt) mt.metalness = 0.55;
+          if ('roughness' in mt) mt.roughness = 0.45;
+          o.userData.envI = 0.45;
+        } else {
+          // FELTRO e MADEIRA: foscos (sem reflexo espelhado do ambiente)
+          if ('metalness' in mt) mt.metalness = 0;
+          if ('roughness' in mt) mt.roughness = 0.96;
+          o.userData.envI = 0.08;
+        }
+        if ('envMapIntensity' in mt) mt.envMapIntensity = o.userData.envI;
+        mt.needsUpdate = true;
       }
     });
-    // Escala NÃO-uniforme: o nariz das almofadas do modelo (X±69.9, Z±33.8)
-    // cai exatamente onde a BORDA da bola para (world ±W/2 × ±H/2 = ±450×±225),
-    // então a bola encosta na parede visível sem atravessar.
-    const SX = (W / 2) / 69.9, SZ = (H / 2) / 33.8, SY = SX;
-    obj.scale.set(SX, SY, SZ);
-    obj.position.set(0, -32.4 * SY, 0);  // feltro (Y≈32.4) para y=0
+    const wrap = new THREE.Group();
+    wrap.add(root);
+    root.scale.set(S, S, S);
+    root.position.set(-X0 * S, -FELT_Y * S, -Z0 * S);
     while (tableGroup.children.length) tableGroup.remove(tableGroup.children[0]);
-    tableGroup.add(obj);
+    tableGroup.add(wrap);
   }, undefined, (e) => { console.warn('Modelo 3D não carregou; mantendo mesa procedural.', e); });
 }
 
@@ -278,6 +296,10 @@ let aimLine, cueStick, ghostBall;
 function buildAimHelpers() {
   const lg = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(), new THREE.Vector3()]);
   aimLine = new THREE.Line(lg, new THREE.LineDashedMaterial({ color: 0xffffff, dashSize: 14, gapSize: 10, transparent: true, opacity: 0.7 }));
+  // A geometria muda todo frame (setFromPoints), mas a boundingSphere fica
+  // ESTAGNADA no valor do 1º render → o frustum culling cortava a linha em
+  // certos ângulos de câmera ("guide line sumindo"). Nunca cullar:
+  aimLine.frustumCulled = false;
   aimLine.visible = false; scene.add(aimLine);
   cueStick = new THREE.Mesh(new THREE.CylinderGeometry(3.2, 5.5, 520, 16),
     new THREE.MeshStandardMaterial({ color: 0xc9a227, roughness: 0.5 }));
@@ -285,6 +307,39 @@ function buildAimHelpers() {
   ghostBall = new THREE.Mesh(new THREE.SphereGeometry(R * 1.01, 20, 16),
     new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.25 }));
   ghostBall.visible = false; scene.add(ghostBall);
+  tryLoadCueModel(); // troca o cilindro pelo modelo 3D do taco, se carregar
+}
+
+// Modelo 3D do taco (public/cue.obj + cue_tex.jpg). A geometria é "assada" no
+// MESMO referencial do cilindro (eixo Y, centrado, 520 de comprimento, ponta
+// fina no +Y), então o posicionamento em updateAimVisuals não muda em nada.
+// Se falhar, o cilindro procedural continua.
+function tryLoadCueModel() {
+  if (!window.THREE || !THREE.OBJLoader) return;
+  let loader;
+  try { loader = new THREE.OBJLoader(); } catch (e) { return; }
+  loader.load('cue.obj', (obj) => {
+    let src = null;
+    obj.traverse((c) => { if (c.isMesh && !src) src = c; });
+    if (!src) return;
+    const g = src.geometry;
+    // Modelo: comprimento 149.9 no eixo +Z, ponta FINA em z=149.9, base em 0.
+    g.rotateX(-Math.PI / 2);              // +Z (ponta) → +Y
+    const SCALE = 520 / 149.904;          // assa no comprimento do cilindro atual
+    g.scale(SCALE, SCALE, SCALE);
+    g.translate(0, -260, 0);              // centraliza (y: 0..520 → -260..260)
+    g.computeVertexNormals();
+    const tex = new THREE.TextureLoader().load('cue_tex.jpg');
+    if (THREE.sRGBEncoding) tex.encoding = THREE.sRGBEncoding;
+    const mesh = new THREE.Mesh(g, new THREE.MeshStandardMaterial({ map: tex, roughness: 0.55, metalness: 0 }));
+    mesh.castShadow = true;
+    mesh.visible = cueStick.visible;
+    mesh.position.copy(cueStick.position);
+    mesh.quaternion.copy(cueStick.quaternion);
+    scene.remove(cueStick);
+    cueStick = mesh;
+    scene.add(cueStick);
+  }, undefined, () => { /* mantém o cilindro */ });
 }
 
 // ===========================================================================
@@ -887,9 +942,10 @@ function buildChips(el, grp) {
     const c = document.createElement('div');
     c.className = 'chip' + (potted ? ' potted' : '');
     const col = ballColor(n);
+    // bolinhas com brilho (visual do design "boteco")
     c.style.background = grp === 'stripe'
-      ? `linear-gradient(to bottom, #f4f6f8 0 27%, ${col} 27% 73%, #f4f6f8 73%)`
-      : col;
+      ? `radial-gradient(circle at 34% 28%, rgba(255,255,255,.5), transparent 42%), linear-gradient(to bottom, #f4f6f8 0 27%, ${col} 27% 73%, #f4f6f8 73%)`
+      : `radial-gradient(circle at 34% 28%, rgba(255,255,255,.55), transparent 44%), ${col}`;
     el.appendChild(c);
   }
 }
@@ -899,8 +955,8 @@ function buildDashes(oppTeam, myTeam) {
   const ow = matchScore[oppTeam] || 0, mw = matchScore[myTeam] || 0;
   for (let i = 0; i < SERIES_GAMES; i++) {
     const d = document.createElement('i');
-    if (i < ow) d.style.background = '#3b82f6';
-    else if (i < ow + mw) d.style.background = '#34d399';
+    if (i < ow) d.style.background = '#5aa0ff';           // vitórias deles (azul)
+    else if (i < ow + mw) d.style.background = '#ffd24a'; // suas (âmbar do tema)
     el.appendChild(d);
   }
 }
@@ -1096,7 +1152,9 @@ let bgSphere = null;
 function applyEnvIntensity() {
   scene.traverse((o) => {
     if (o.isMesh && o !== bgSphere && o.material && 'envMapIntensity' in o.material) {
-      o.material.envMapIntensity = o.userData.shiny ? 0.8 : 0.3;
+      // userData.envI = intensidade definida por material (mesa fosca etc.);
+      // sem ela: bolas (shiny) refletem bem, resto pouco.
+      o.material.envMapIntensity = o.userData.envI != null ? o.userData.envI : (o.userData.shiny ? 0.8 : 0.3);
       o.material.needsUpdate = true;
     }
   });
