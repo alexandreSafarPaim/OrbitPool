@@ -4,10 +4,17 @@
   "description": "Jogo de bilhar (8-ball) multiplayer para web, em tempo real, sem dependências.",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "dev": "node server.js",
+    "build": "node build.js",
+    "start": "node build.js && PUBLIC_DIR=dist node server.js"
   },
   "engines": {
     "node": ">=18"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "html-minifier-terser": "^7.2.0",
+    "javascript-obfuscator": "^4.2.2",
+    "terser": "^5.49.0"
+  }
 }

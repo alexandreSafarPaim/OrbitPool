@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = path.resolve(__dirname, process.env.PUBLIC_DIR || 'public');
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 const MIME = {
@@ -47,7 +47,14 @@ const server = http.createServer((req, res) => {
       return res.end('Not found');
     }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      // security headers (no deploy em Pages, o dist/_headers cobre isso)
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    });
     res.end(data);
   });
 });
@@ -129,10 +136,16 @@ server.on('upgrade', (req, socket) => {
 
   const conn = new Conn(socket);
 
+  const MAX_BUFFER = 1024 * 1024; // 1MB: maior 'shot'/'resync' real fica bem abaixo
   socket.on('data', (chunk) => {
     conn.buffer = Buffer.concat([conn.buffer, chunk]);
+    if (conn.buffer.length > MAX_BUFFER) { conn.close(); return; } // anti-DoS
     parseFrames(conn);
   });
+  // 'end' (FIN) É o evento que chega quando o outro lado fecha de forma
+  // limpa — em sockets de upgrade o 'close' pode nunca disparar sozinho,
+  // porque o Node não fecha o nosso lado automaticamente aqui.
+  socket.on('end', () => conn.close());
   socket.on('close', () => conn.close());
   socket.on('error', () => conn.close());
 });
@@ -154,6 +167,7 @@ function parseFrames(conn) {
       len = Number(buf.readBigUInt64BE(2));
       offset = 10;
     }
+    if (len > 1024 * 1024) { conn.close(); return; } // frame gigante = ataque
 
     let maskKey;
     if (masked) {
@@ -201,7 +215,7 @@ function leaveRoom(conn) {
   if (!room) return;
   room.clients.delete(conn);
   conn.room = null;
-  if (!room.started && room.slots === 4) broadcastLobby(room); // ainda no lobby de times
+  if (!room.started) broadcastLobby(room); // ainda no lobby da sala
   else broadcastRoom(room, { t: 'peer_left', no: conn.playerNo });
   if (room.clients.size === 0) rooms.delete(room.id);
 }
@@ -227,8 +241,11 @@ function handleMessage(conn, raw) {
       if (!room) room = makeRoom(roomId, msg.slots | 0); // 1º a entrar (host) define 2 ou 4 vagas
 
       if (room.clients.size >= room.slots) {
-        conn.send({ t: 'full' }); // sem vaga (reconexão usa a vaga de quem caiu)
-        return;
+        // Sala "cheia" mas com partida rolando: pode ser reconexão de quem
+        // caiu sem fechar o socket (celular). Derruba o zumbi de mesmo nome.
+        const zombie = room.started ? [...room.clients].find((c) => c.name === conn.name) : null;
+        if (!zombie) { conn.send({ t: 'full' }); return; }
+        zombie.close(); // leaveRoom remove e libera o playerNo dele
       }
 
       room.clients.add(conn);
@@ -243,16 +260,8 @@ function handleMessage(conn, raw) {
         // RECONEXÃO em partida andando: avisa os demais — o menor nº presente
         // responde com o snapshot ('resync') para quem voltou.
         broadcastRoom(room, { t: 'rejoined', no: conn.playerNo, name: conn.name }, conn);
-      } else if (room.slots === 2 && room.clients.size === 2) {
-        // 1v1: começa direto (comportamento original).
-        room.started = true;
-        const [a, b] = [...room.clients];
-        a.send({ t: 'start', you: a.playerNo, opponent: b.name, startTurn: 1 });
-        b.send({ t: 'start', you: b.playerNo, opponent: a.name, startTurn: 1 });
-      } else if (room.slots === 4) {
-        broadcastLobby(room); // 2v2: lobby de times (o host organiza e envia 'start')
       } else {
-        conn.send({ t: 'waiting' });
+        broadcastLobby(room); // 1v1 e 2v2: lobby da sala (o host envia 'start')
       }
       break;
     }

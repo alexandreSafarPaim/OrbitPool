@@ -31,6 +31,12 @@ let roomSlots = 2;                 // 2 = 1v1, 4 = 2v2
 let players = { 1: { name: T('default.you'), team: 1 }, 2: { name: T('default.opp'), team: 2 } };
 let TURN_ORDER = [1, 2];
 let iAmHost = false;
+// Linha guia: configuração DA SALA (host define no lobby; vale p/ todos).
+// No treino com bot é preferência local (hotkey L), persistida.
+let roomGuide = true;
+let botGuide = true;
+try { botGuide = localStorage.getItem('orbitpool.guide') !== '0'; } catch (e) {}
+const guideOn = () => (botLevel ? botGuide : roomGuide);
 let lobbyRoster = [];              // lista do lobby 2v2: [{no,name}]
 let teamSel = {};                  // escolha de times do host: no → 1|2
 const teamOf = (no) => (players[no] ? players[no].team : (no === 1 ? 1 : 2));
@@ -591,7 +597,9 @@ function send(o) { OrbitNet.send(o); }
 
 function handleNet(msg) {
   switch (msg.t) {
-    case '_neterror': setLobbyMsg(msg.msg || T('lm.netError')); break;
+    case '_neterror': // falha de rede: no lobby, limpa e libera para tentar de novo
+      if (phase === 'lobby') abandonRoom(msg.msg || T('lm.netError'));
+      break;
     case 'joined': // servidor (?server) ou host P2P local
       myNo = msg.playerNo; if (msg.slots) roomSlots = msg.slots;
       setLobbyMsg(T('lm.joined', { n: myNo }) + (myNo === 1 ? T('lm.waitingOthers') : ''));
@@ -601,7 +609,10 @@ function handleNet(msg) {
       setLobbyMsg(T('lm.joinedRoom', { n: myNo }));
       break;
     case 'waiting': setLobbyMsg(roomSlots === 4 ? T('lm.waiting4') : T('lm.waiting2')); break;
-    case 'full': setLobbyMsg(T('lm.full')); break;
+    case 'full': if (phase === 'lobby') abandonRoom(T('lm.full')); break;
+    case 'roomclosed': // host cancelou a sala no lobby
+      if (phase === 'lobby') abandonRoom(T('tl.closed'));
+      break;
     case 'lobby': // roster do 2v2 mudou (entrou/saiu alguém)
       lobbyRoster = msg.players || []; roomSlots = msg.slots || roomSlots;
       renderTeamLobby();
@@ -609,6 +620,10 @@ function handleNet(msg) {
     case 'teams': // host mexeu nos times — convidados veem ao vivo
       teamSel = msg.sel || {};
       renderTeamLobby();
+      break;
+    case 'roomcfg': // host mudou configurações da sala (linha guia etc.)
+      roomGuide = msg.guide !== false;
+      if (phase === 'lobby') renderTeamLobby();
       break;
     case 'start': applyStart(msg); break;
     case 'shot': {
@@ -628,6 +643,10 @@ function handleNet(msg) {
       }
       break;
     case 'peer_left':
+      // Ainda no lobby da sala: convidado perdeu o host → sala morreu, volta
+      // ao menu (o host nunca recebe isso no lobby — saída de convidado vira
+      // atualização de 'lobby').
+      if (phase === 'lobby') { if (!iAmHost) abandonRoom(T('tl.closed')); break; }
       if (!game.gameOver) setStatus(T('st.left', { name: msg.no ? playerName(msg.no) : T('default.opp') }));
       break;
     case 'rejoined': { // alguém RECONECTOU numa partida em andamento
@@ -659,11 +678,12 @@ function sendResync(no) {
     t: 'resync', for: no,
     players, order: TURN_ORDER, slots: roomSlots,
     game: { open: game.open, groups: game.groups, gameOver: game.gameOver, winner: game.winner },
-    matchScore, matchOver, currentTurn, ballInHand,
+    matchScore, matchOver, currentTurn, ballInHand, guide: roomGuide,
     balls: balls.map((b) => ({ n: b.n, x: b.x, y: b.y, potted: b.potted })),
   });
 }
 function applyResync(msg) {
+  roomGuide = msg.guide !== false;
   players = msg.players || players;
   TURN_ORDER = (msg.order || [1, 2]).slice();
   roomSlots = msg.slots || 2;
@@ -688,8 +708,9 @@ function applyResync(msg) {
 
 // Aplica a mensagem 'start' (1v1 legado ou 2v2 com times) e começa o jogo.
 function applyStart(msg) {
-  if (msg.players && msg.order) { // 2v2: host montou os times
-    players = msg.players; TURN_ORDER = msg.order.slice(); roomSlots = 4;
+  roomGuide = msg.guide !== false; // config da sala (default: ligada)
+  if (msg.players && msg.order) { // host montou a sala (1v1 ou 2v2)
+    players = msg.players; TURN_ORDER = msg.order.slice(); roomSlots = msg.slots || (msg.order.length === 4 ? 4 : 2);
   } else { // 1v1: monta o roster local a partir do nome do adversário
     const oppNo = myNo === 1 ? 2 : 1;
     oppName = msg.opponent || T('default.opp');
@@ -704,14 +725,44 @@ function applyStart(msg) {
   startGame();
 }
 
+// Sai/fecha a sala e volta ao menu inicial SEM recarregar a página: derruba a
+// conexão (OrbitNet.leave), esconde o lobby da sala e destrava os botões.
+function abandonRoom(msgText) {
+  try { if (OrbitNet.leave) OrbitNet.leave(); } catch (e) {}
+  myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true;
+  const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
+  const rs = document.getElementById('roomShare'); if (rs) rs.hidden = true;
+  ['createBtn', 'createBtn2', 'joinBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = false; });
+  setLobbyMsg(msgText || '');
+}
+
 // ===========================================================================
 // Lobby de times (2v2): o host distribui os 4 jogadores em 2 duplas
 // ===========================================================================
 function renderTeamLobby() {
   const ov = document.getElementById('teamLobby');
-  if (!ov || roomSlots !== 4 || phase !== 'lobby') return;
+  if (!ov || phase !== 'lobby' || !lobbyRoster.length) return;
+  const is2v2 = roomSlots === 4;
   ov.classList.remove('hidden');
+  ov.classList.toggle('solo', !is2v2); // 1v1: botões finos e empilhados
   document.getElementById('tlCode').textContent = roomInput;
+  // bloco de compartilhar o código (agora dentro do lobby da sala; todos veem)
+  document.getElementById('roomCodeVal').textContent = roomInput;
+  document.getElementById('roomShare').hidden = lobbyRoster.length >= roomSlots;
+  const tt = document.getElementById('tlTitle');
+  if (tt) tt.textContent = is2v2 ? T('tl.title') : '🎱 1v1 — sala';
+  const ts = document.getElementById('tlSub');
+  if (ts) ts.style.display = is2v2 ? '' : 'none';
+  // switch da linha guia (host controla; todos veem)
+  const gsw = document.getElementById('tlGuide');
+  if (gsw) {
+    gsw.checked = roomGuide;
+    gsw.disabled = !iAmHost;
+    gsw.onchange = iAmHost ? () => {
+      roomGuide = gsw.checked;
+      send({ t: 'roomcfg', guide: roomGuide });
+    } : null;
+  }
 
   // Times padrão por ordem de entrada (ímpares=A, pares=B); host pode mudar.
   for (const p of lobbyRoster) if (!teamSel[p.no]) teamSel[p.no] = (p.no % 2 === 1) ? 1 : 2;
@@ -723,6 +774,7 @@ function renderTeamLobby() {
     const nm = document.createElement('span'); nm.className = 'tlName';
     nm.textContent = p.name + (p.no === myNo ? T('tl.you') : '') + (p.no === 1 ? ' 👑' : '');
     row.appendChild(nm);
+    if (!is2v2) { list.appendChild(row); continue; } // 1v1: sem escolha de time
     for (const t of [1, 2]) {
       const b = document.createElement('button');
       b.className = 'tlTeam t' + t + (teamSel[p.no] === t ? ' sel' : '');
@@ -738,20 +790,23 @@ function renderTeamLobby() {
     }
     list.appendChild(row);
   }
-  for (let i = lobbyRoster.length; i < 4; i++) {
+  for (let i = lobbyRoster.length; i < roomSlots; i++) {
     const row = document.createElement('div'); row.className = 'tlRow empty';
     row.innerHTML = '<span class="tlName"></span>'; row.firstChild.textContent = T('tl.waitPlayer');
     list.appendChild(row);
   }
 
   const nA = lobbyRoster.filter((p) => teamSel[p.no] === 1).length;
-  const full = lobbyRoster.length === 4, balanced = nA === 2;
-  document.getElementById('tlRandom').style.display = iAmHost ? '' : 'none';
+  const full = lobbyRoster.length === roomSlots;
+  const balanced = !is2v2 || nA === 2;
+  document.getElementById('tlRandom').style.display = (iAmHost && is2v2) ? '' : 'none';
   const st = document.getElementById('tlStart');
   st.style.display = iAmHost ? '' : 'none';
   st.disabled = !(full && balanced);
+  const cb = document.getElementById('tlCancel');
+  if (cb) cb.textContent = iAmHost ? T('tl.close') : T('tl.leave');
   document.getElementById('tlMsg').textContent = !full
-    ? T('tl.waiting', { n: lobbyRoster.length, code: roomInput })
+    ? T('tl.waiting', { n: lobbyRoster.length, code: roomInput }).replace('/4', '/' + roomSlots)
     : (!balanced ? T('tl.balance')
       : (iAmHost ? T('tl.ready') : T('tl.waitHost')));
 }
@@ -765,15 +820,21 @@ function randomTeams() {
   renderTeamLobby();
 }
 
-// Host: valida, monta a rotação A1→B1→A2→B2 e dá o start para todos.
+// Host: valida, monta a rotação e dá o start para todos (1v1 e 2v2).
 function hostStart2v2() {
-  const nosA = lobbyRoster.filter((p) => teamSel[p.no] === 1).map((p) => p.no).sort((a, b) => a - b);
-  const nosB = lobbyRoster.filter((p) => teamSel[p.no] === 2).map((p) => p.no).sort((a, b) => a - b);
-  if (lobbyRoster.length !== 4 || nosA.length !== 2 || nosB.length !== 2) return;
-  const order = [nosA[0], nosB[0], nosA[1], nosB[1]]; // alterna time e parceiro
-  const pl = {};
-  for (const p of lobbyRoster) pl[p.no] = { name: p.name, team: teamSel[p.no] };
-  const msg = { t: 'start', players: pl, order, startTurn: order[0], slots: 4 };
+  let order, pl = {};
+  if (roomSlots === 4) {
+    const nosA = lobbyRoster.filter((p) => teamSel[p.no] === 1).map((p) => p.no).sort((a, b) => a - b);
+    const nosB = lobbyRoster.filter((p) => teamSel[p.no] === 2).map((p) => p.no).sort((a, b) => a - b);
+    if (lobbyRoster.length !== 4 || nosA.length !== 2 || nosB.length !== 2) return;
+    order = [nosA[0], nosB[0], nosA[1], nosB[1]]; // alterna time e parceiro
+    for (const p of lobbyRoster) pl[p.no] = { name: p.name, team: teamSel[p.no] };
+  } else {
+    if (lobbyRoster.length !== 2) return;
+    order = [1, 2];
+    for (const p of lobbyRoster) pl[p.no] = { name: p.name, team: p.no };
+  }
+  const msg = { t: 'start', players: pl, order, startTurn: order[0], slots: roomSlots, guide: roomGuide };
   send(msg);
   if (OrbitNet.markStarted) OrbitNet.markStarted();
   applyStart(msg);
@@ -908,6 +969,11 @@ function onKeyDown(e) {
   else if (e.key === 'Tab') { e.preventDefault(); topOverride = true; }
   else if (e.key === 'Shift') beginContact();
   else if (e.key === 'h' || e.key === 'H') toggleControls();
+  else if ((e.key === 'l' || e.key === 'L') && botLevel) { // linha guia (SÓ treino c/ bot)
+    botGuide = !botGuide;
+    try { localStorage.setItem('orbitpool.guide', botGuide ? '1' : '0'); } catch (err) {}
+    musicToast(botGuide ? '📏 linha guia ativada' : '📏 linha guia desativada');
+  }
   // ---- Música: N = próxima · B = anterior · M = pausar/tocar --------------
   else if ((e.key === 'n' || e.key === 'N') && window.OrbitAudio && OrbitAudio.nextMusic) {
     const i = OrbitAudio.nextMusic(); if (i) musicToast('♪ ' + i.title);
@@ -1096,8 +1162,9 @@ function updateAimVisuals() {
   const shootDir = showMine ? Physics.squirtedDir(dir, cueOffset.a) : dir;
   const pr = predict(shootDir);
   const a = to3(c.x, c.y, R), b = to3(pr.x, pr.y, R);
-  aimLine.geometry.setFromPoints([a, b]); aimLine.computeLineDistances(); aimLine.visible = true;
-  ghostBall.position.copy(b); ghostBall.visible = !!pr.ball;
+  aimLine.geometry.setFromPoints([a, b]); aimLine.computeLineDistances();
+  aimLine.visible = guideOn(); // config da sala (ou preferência local no bot)
+  ghostBall.position.copy(b); ghostBall.visible = guideOn() && !!pr.ball;
   // taco atrás da branca, apontando na direção da tacada (recua com a força)
   const pw = showMine ? chargePower : (oppAim ? oppAim.pow : 0);
   const back = 45 + pw * 150, stickLen = 520;
@@ -1211,6 +1278,13 @@ function startGame() {
   oppAim = null; oppAimTarget = null; cueDragTarget = null;
   setAim(0);
   phase = currentTurn === myNo ? 'aim' : 'wait';
+  // etiqueta com o CÓDIGO DA SALA (só multiplayer — útil p/ reconvidar/reconectar)
+  const rt = document.getElementById('roomTag');
+  if (rt) {
+    rt.hidden = !!botLevel || !roomInput;
+    const rc = document.getElementById('roomTagCode');
+    if (rc) rc.textContent = roomInput;
+  }
   if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   for (const b of balls) { const m = ballMeshes[b.n]; if (m) { m.quaternion.set(0, 0, 0, 1); m.position.set(b.x - W / 2, R, b.y - H / 2); m.visible = true; } }
   updateHUD();
@@ -1493,10 +1567,8 @@ function init() {
     if (window.OrbitAudio) OrbitAudio.unlock();
     const nm = getNameOrWarn(); if (!nm) return;
     botLevel = null; myName = nm; iAmHost = true; roomSlots = slots; // PvP
-    teamSel = {}; lobbyRoster = [];
+    teamSel = {}; lobbyRoster = []; roomGuide = true;
     roomInput = OrbitNet.makeCode();
-    document.getElementById('roomCodeVal').textContent = roomInput;
-    document.getElementById('roomShare').hidden = false;
     lockInputs();
     setLobbyMsg(slots === 4 ? T('lm.created4') : T('lm.created2'));
     hostRoom(slots);
@@ -1508,6 +1580,8 @@ function init() {
   if (tlR) tlR.addEventListener('click', () => { if (iAmHost) randomTeams(); });
   const tlS = document.getElementById('tlStart');
   if (tlS) tlS.addEventListener('click', () => { if (iAmHost) hostStart2v2(); });
+  const tlC = document.getElementById('tlCancel');
+  if (tlC) tlC.addEventListener('click', () => abandonRoom(iAmHost ? T('tl.closedByYou') : T('tl.leftByYou')));
   document.getElementById('joinBtn').addEventListener('click', () => {
     if (window.OrbitAudio) OrbitAudio.unlock();
     const nm = getNameOrWarn(); if (!nm) return;
@@ -1528,6 +1602,12 @@ function init() {
 
   document.getElementById('rematchBtn').addEventListener('click', () => { document.getElementById('rematchMsg').textContent = T('end.waitingOpp'); doRematch(true); });
   document.getElementById('ctrlBtn').addEventListener('click', toggleControls);
+  const rtEl = document.getElementById('roomTag');
+  if (rtEl) rtEl.addEventListener('click', () => {
+    const done = () => { setStatus('Código ' + roomInput + ' copiado!'); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(roomInput).then(done).catch(done);
+    else done();
+  });
 
   // ================= CONTROLES TOUCH (só no celular) =================
   if (IS_MOBILE) {

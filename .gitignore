@@ -8,3 +8,4 @@ assets/
 # temporários
 *.log
 .DS_Store
+dist/

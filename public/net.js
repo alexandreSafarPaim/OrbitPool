@@ -48,6 +48,24 @@ window.OrbitNet = {
   // tratamento de desconexões: antes = atualizar lobby, depois = peer_left).
   markStarted() { this._started = true; },
 
+  // Sai/fecha a sala SEM recarregar a página (host avisa antes de derrubar).
+  leave() {
+    this._closing = true;
+    try {
+      if (this._isHost && this.mode === 'server' && this._ws && this._ws.readyState === 1) {
+        try { this._ws.send(JSON.stringify({ t: 'roomclosed' })); } catch (e) {}
+      }
+      if (this._isHost) for (const g of this._guests) { if (g.open) { try { g.send({ t: 'roomclosed' }); } catch (e) {} } }
+      if (this._conn) { try { this._conn.close(); } catch (e) {} }
+      if (this._peer) { try { this._peer.destroy(); } catch (e) {} }
+      if (this._ws) { try { this._ws.close(); } catch (e) {} }
+    } catch (e) {}
+    this._peer = null; this._conn = null; this._ws = null;
+    this._guests = []; this._roster = null; this._started = false;
+    this._lost = {}; this._isHost = false;
+    setTimeout(() => { this._closing = false; }, 300);
+  },
+
   send(obj) {
     if (this.mode === 'server') { if (this._ws && this._ws.readyState === 1) this._ws.send(JSON.stringify(obj)); return; }
     if (this._isHost) { // host = hub: repassa a todos os convidados
@@ -62,7 +80,7 @@ window.OrbitNet = {
     this._ws = ws;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'join', room: code, name: this._myName, slots: slots || undefined }));
     ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } this._onMsg(m); };
-    ws.onclose = () => this._onMsg({ t: '_neterror', msg: NET_T('net.closed') });
+    ws.onclose = () => { if (!this._closing) this._onMsg({ t: '_neterror', msg: NET_T('net.closed') }); };
     ws.onerror = () => this._onMsg({ t: '_neterror', msg: NET_T('net.serverFail') });
   },
 
@@ -74,11 +92,11 @@ window.OrbitNet = {
     peer.on('open', () => {
       this._onMsg({ t: 'joined', playerNo: 1, slots: this._slots });
       this._onMsg({ t: 'waiting' });
-      if (this._slots === 4) this._emitLobby();
+      this._emitLobby(); // 1v1 e 2v2: todo mundo passa pelo lobby da sala
       peer.on('connection', (conn) => {
-        const canJoin = !this._started
-          ? this._guests.length < this._slots - 1
-          : Object.keys(this._lost || {}).length > 0; // partida rolando: só reconexão em vaga
+        // Partida rolando: aceita e decide no _hello (pode ser reconexão em
+        // vaga OU substituição de conexão zumbi — só dá pra saber pelo nome).
+        const canJoin = this._started || this._guests.length < this._slots - 1;
         if (!canJoin) {
           conn.on('open', () => { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} });
           return;
@@ -108,13 +126,25 @@ window.OrbitNet = {
         if (conn._no) return; // hello duplicado
         let no = 0;
         if (this._started) {
-          // RECONEXÃO: partida em andamento — só entra quem ocupa uma vaga
-          // deixada por alguém que caiu (prefere a vaga com o MESMO nome).
+          // RECONEXÃO em partida andando: 1º tenta vaga de quem caiu (prefere
+          // o MESMO nome); 2º, se não há vaga, procura uma conexão ZUMBI com o
+          // mesmo nome (celular que fechou sem avisar) e a substitui.
           const lost = Object.entries(this._lost || {});
-          if (!lost.length) { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} return; }
           const byName = lost.find(([, nm]) => nm === (m.name || ''));
-          no = +(byName ? byName[0] : lost[0][0]);
-          delete this._lost[no];
+          if (byName || lost.length) {
+            no = +(byName ? byName[0] : lost[0][0]);
+            delete this._lost[no];
+          } else {
+            const dup = this._guests.find((g) => g._name === (m.name || ''));
+            if (dup) {
+              no = dup._no;
+              this._guests = this._guests.filter((g) => g !== dup);
+              this._roster = this._roster.filter((p) => p.no !== no);
+              dup._replaced = true; // não gerar peer_left/vaga ao fechar
+              try { dup.close(); } catch (e) {}
+            }
+          }
+          if (!no) { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} return; }
         } else {
           no = this._nextNo();
           if (!no) { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} return; }
@@ -128,13 +158,8 @@ window.OrbitNet = {
           const msg = { t: 'rejoined', no, name: conn._name };
           this._onMsg(msg);
           for (const g of this._guests) { if (g !== conn && g.open) { try { g.send(msg); } catch (e) {} } }
-        } else if (this._slots === 2) {
-          // 1v1: começa direto (comportamento original)
-          this._oppName = conn._name; this._started = true;
-          this._onMsg({ t: 'start', opponent: this._oppName, startTurn: 1 });
-          try { conn.send({ t: 'start', opponent: this._myName, startTurn: 1 }); } catch (e) {}
         } else {
-          this._emitLobby(); // 2v2: todos veem o lobby de times
+          this._emitLobby(); // 1v1 e 2v2: lobby da sala (host dá o start)
         }
         return;
       }
@@ -148,6 +173,7 @@ window.OrbitNet = {
     conn.on('error', drop);
   },
   _dropGuest(conn) {
+    if (conn._replaced) return; // foi trocada por uma reconexão — nada a fazer
     const i = this._guests.indexOf(conn);
     if (i < 0) return;
     this._guests.splice(i, 1);
@@ -159,10 +185,8 @@ window.OrbitNet = {
       const m = { t: 'peer_left', no: conn._no };
       this._onMsg(m);
       for (const g of this._guests) { if (g.open) { try { g.send(m); } catch (e) {} } }
-    } else if (this._slots === 4) {
-      this._emitLobby(); // ainda no lobby: só atualiza a lista
     } else {
-      this._onMsg({ t: 'peer_left' });
+      this._emitLobby(); // ainda no lobby (1v1 ou 2v2): só atualiza a lista
     }
   },
   _p2pJoin(code) {
@@ -173,9 +197,16 @@ window.OrbitNet = {
       this._conn = conn;
       conn.on('open', () => { try { conn.send({ t: '_hello', name: this._myName }); } catch (e) {} });
       conn.on('data', (m) => { if (m && m.t) this._onMsg(m); });
-      conn.on('close', () => this._onMsg({ t: 'peer_left' }));
-      conn.on('error', () => this._onMsg({ t: 'peer_left' }));
-      setTimeout(() => { if (!this._conn || !this._conn.open) this._onMsg({ t: '_neterror', msg: NET_T('net.timeout') }); }, 9000);
+      conn.on('close', () => { if (!this._closing) this._onMsg({ t: 'peer_left' }); });
+      conn.on('error', () => { if (!this._closing) this._onMsg({ t: 'peer_left' }); });
+      setTimeout(() => {
+        // 10s sem conectar: desiste, limpa e libera para tentar de novo.
+        // Só age se ESTA tentativa ainda for a atual (o jogador pode já ter
+        // cancelado ou iniciado outra — não pode derrubar a nova conexão).
+        if (this._conn !== conn || conn.open) return;
+        this.leave();
+        this._onMsg({ t: '_neterror', msg: NET_T('net.notFound') });
+      }, 10000);
     });
     peer.on('error', (err) => {
       const t = ((err && err.type) || err) + '';
