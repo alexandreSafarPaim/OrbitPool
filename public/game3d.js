@@ -6,6 +6,9 @@
    ========================================================================= */
 'use strict';
 
+// ---- i18n: T(chave, params) → texto no idioma atual (i18n.js) --------------
+const T = (k, p) => (window.OrbitI18N ? OrbitI18N.t(k, p) : k);
+
 // ---- Cores das bolas (iguais ao 2D) ---------------------------------------
 const SOLID = { 1: '#f4c430', 2: '#1f5fd0', 3: '#d0322b', 4: '#6a2fa0', 5: '#e07b18', 6: '#1a8f4a', 7: '#7a1f1f' };
 const colorFor = (n) => (n === 8 ? '#161616' : (n <= 7 ? SOLID[n] : SOLID[n - 8]));
@@ -18,14 +21,14 @@ const MAXDRAG_PX = 190;   // arraste (px de tela) para potência máxima
 // Estado de jogo (espelha o 2D)
 // ===========================================================================
 let balls = [];
-let myNo = 0, oppName = 'Adversário', myName = 'Você';
+let myNo = 0, oppName = T('default.opp'), myName = T('default.you');
 let currentTurn = 1;
 // ---- Salas 1v1 e 2v2 (duplas) ---------------------------------------------
 // players: playerNo → { name, team (1|2) }. TURN_ORDER: rotação fixa de
 // tacadas — 1v1: [1,2]; 2v2: [A1, B1, A2, B2] (padrão scotch doubles: alterna
 // time E parceiro; quem encaçapa legal continua na vez).
 let roomSlots = 2;                 // 2 = 1v1, 4 = 2v2
-let players = { 1: { name: 'Você', team: 1 }, 2: { name: 'Adversário', team: 2 } };
+let players = { 1: { name: T('default.you'), team: 1 }, 2: { name: T('default.opp'), team: 2 } };
 let TURN_ORDER = [1, 2];
 let iAmHost = false;
 let lobbyRoster = [];              // lista do lobby 2v2: [{no,name}]
@@ -37,7 +40,7 @@ const nextTurnAfter = (no) => {
 };
 // Modo treino (single-player): botLevel != null → o adversário é a IA (jogador 2).
 let botLevel = null; const BOT_NO = 2; let botTimer = null;
-const BOT_NAMES = { iniciante: 'Bot Iniciante', amador: 'Bot Amador', pro: 'Bot Pro', mineirinho: 'Mineirinho de Araxá' };
+const botName = (level) => T(({ iniciante: 'botname.iniciante', amador: 'botname.amador', pro: 'botname.pro', mineirinho: 'botname.mineirinho' })[level] || 'botname.default');
 let phase = 'lobby';            // lobby | aim | sim | wait | ended
 let ballInHand = false;
 let ws = null, roomInput = 'sala1';
@@ -111,7 +114,7 @@ function openGpuModal(title, subHTML, dismissLabel) {
   if (steps) steps.textContent = url;
   const openBtn = document.getElementById('gpuOpenBtn');
   if (openBtn) {
-    openBtn.textContent = '🔧 Abrir configurações do navegador';
+    openBtn.textContent = T('gpu.open');
     openBtn.onclick = () => {
       // Tenta abrir em nova aba; navegadores BLOQUEIAM abrir páginas internas
       // (chrome:// etc.) a partir de sites — nesse caso, copia o endereço e
@@ -119,7 +122,7 @@ function openGpuModal(title, subHTML, dismissLabel) {
       let w = null;
       try { w = window.open(url, '_blank'); } catch (e) { w = null; }
       if (!w) {
-        const done = () => { openBtn.textContent = '✓ Endereço copiado! Cola numa aba nova'; };
+        const done = () => { openBtn.textContent = T('gpu.copied'); };
         if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(url).then(done).catch(done);
         else done();
       }
@@ -132,11 +135,7 @@ function openGpuModal(title, subHTML, dismissLabel) {
 
 function maybeWarnSoftwareGL() {
   if (!detectSoftwareGL()) return;
-  openGpuModal(
-    '🐢 Tá rodando no modo lento…',
-    'A <b>aceleração gráfica</b> do seu navegador está desativada — o jogo funciona, ' +
-    'mas sem usar a placa de vídeo ele trava e engasga. Ativando, a experiência melhora <b>muito</b>.',
-    'Jogar assim mesmo');
+  openGpuModal(T('gpu.slow.title'), T('gpu.slow.body'), T('gpu.playAnyway'));
 }
 
 // WebGL indisponível de vez: mesmo modal, botões desabilitados (sem trocar
@@ -147,13 +146,8 @@ function showWebGLError() {
     if (b) b.disabled = true;
   });
   document.querySelectorAll('.botLvl').forEach((b) => { b.disabled = true; });
-  setLobbyMsg('⚠️ Sem WebGL o jogo não roda — ative a aceleração gráfica e recarregue.');
-  openGpuModal(
-    '😵 Este navegador está sem WebGL',
-    'O jogo é 3D e precisa de <b>WebGL</b> para desenhar a mesa — normalmente ele some quando a ' +
-    '<b>aceleração de hardware</b> do navegador está desativada. Ative, reinicie o navegador e recarregue esta página. ' +
-    'Dá pra conferir o estado em <b>chrome://gpu</b>.',
-    'Entendi');
+  setLobbyMsg(T('gpu.noWebglLobby'));
+  openGpuModal(T('gpu.nowebgl.title'), T('gpu.nowebgl.body'), T('gpu.ok'));
 }
 
 const scene = new THREE.Scene();
@@ -450,7 +444,13 @@ function updateCamera(dt) {
     desired = new THREE.Vector3(c.x - W / 2 - d.x * back, height, c.y - H / 2 - d.y * back);
     look = new THREE.Vector3(c.x - W / 2 + d.x * 160, 0, c.y - H / 2 + d.y * 160);
   } else {
-    desired = new THREE.Vector3(0, 1250 * zoom, 300 * zoom); // vista de cima (leve inclinação)
+    // Vista de espectador: órbita livre (arrastar no celular gira). O padrão
+    // (yaw 0, elev 1.34) equivale à antiga "vista de cima com leve inclinação".
+    const dist = 1285 * zoom;
+    desired = new THREE.Vector3(
+      dist * Math.cos(freeElev) * Math.sin(freeYaw),
+      dist * Math.sin(freeElev),
+      dist * Math.cos(freeElev) * Math.cos(freeYaw));
     look = new THREE.Vector3(0, 0, 0);
   }
   const k = 1 - Math.pow(0.0022, dt);
@@ -471,11 +471,11 @@ function deriveRuleEvents(events) {
   return { firstContact, cuePotted, potted, pottedOrder };
 }
 function remainingOfGroup(grp) { return balls.filter((b) => !b.potted && groupName(b.n) === grp).length; }
-function playerName(no) { return (players[no] && players[no].name) || (no === myNo ? myName : oppName) || ('Jogador ' + no); }
+function playerName(no) { return (players[no] && players[no].name) || (no === myNo ? myName : oppName) || T('hud.playerN', { n: no }); }
 // Nome do time (2v2: "Alex & Bia"; 1v1: nome do jogador).
 function teamLabel(team) {
   const names = TURN_ORDER.filter((no) => teamOf(no) === team).map(playerName);
-  return names.join(' & ') || ('Time ' + team);
+  return names.join(' & ') || T('team.n', { n: team });
 }
 
 // Regras do 8-ball. GRUPOS, VITÓRIA e FALTAS são por TIME (game.groups é
@@ -486,11 +486,11 @@ function evaluateShot(ev) {
   const myTeam = teamOf(shooter), oppTeam = myTeam === 1 ? 2 : 1;
   const nextNo = nextTurnAfter(shooter); // quem joga se a vez passar
   let foul = false; const reasons = [];
-  if (ev.firstContact === null) { foul = true; reasons.push('a branca não tocou em nenhuma bola'); }
-  if (ev.cuePotted) { foul = true; reasons.push('a branca caiu (scratch)'); }
+  if (ev.firstContact === null) { foul = true; reasons.push(T('foul.noContact')); }
+  if (ev.cuePotted) { foul = true; reasons.push(T('foul.scratch')); }
   if (ev.firstContact !== null) {
     const fc = groupName(ev.firstContact);
-    if (game.open) { if (fc === 'eight') { foul = true; reasons.push('acertou a 8 primeiro com a mesa aberta'); } }
+    if (game.open) { if (fc === 'eight') { foul = true; reasons.push(T('foul.eightFirstOpen')); } }
     else {
       const myGrp = game.groups[myTeam];
       // Estado ANTES da tacada: endShot já marcou como potted as bolas desta
@@ -498,8 +498,8 @@ function evaluateShot(ev) {
       // matar a última bola do grupo virava falta ("devia acertar a 8").
       const pottedMineNow = ev.potted.filter((n) => groupName(n) === myGrp).length;
       const cleared = remainingOfGroup(myGrp) + pottedMineNow === 0;
-      if (cleared) { if (fc !== 'eight') { foul = true; reasons.push('devia acertar a 8 primeiro'); } }
-      else if (fc !== myGrp) { foul = true; reasons.push('acertou a bola do adversário primeiro'); }
+      if (cleared) { if (fc !== 'eight') { foul = true; reasons.push(T('foul.mustHit8')); } }
+      else if (fc !== myGrp) { foul = true; reasons.push(T('foul.wrongGroup')); }
     }
   }
   const numbered = ev.potted.filter((n) => n !== 8);
@@ -512,8 +512,8 @@ function evaluateShot(ev) {
     const clearedBefore = myGrp && remainingOfGroup(myGrp) + pottedMineNow === 0;
     const legal = !foul && !ev.cuePotted && !game.open && clearedBefore;
     game.gameOver = true; game.winner = legal ? myTeam : oppTeam; // vencedor = TIME
-    game.lastMsg = legal ? `Bola 8 encaçapada! ${teamLabel(myTeam)} venceu! 🏆`
-      : `${playerName(shooter)} encaçapou a 8 fora de hora. ${teamLabel(oppTeam)} venceu!`;
+    game.lastMsg = legal ? T('msg.win8', { team: teamLabel(myTeam) })
+      : T('msg.lose8', { name: playerName(shooter), team: teamLabel(oppTeam) });
     return { nextTurn: shooter, ballInHand: false, foul };
   }
   let continueTurn = false;
@@ -522,17 +522,17 @@ function evaluateShot(ev) {
     if (grp === 'solid' || grp === 'stripe') {
       game.groups[myTeam] = grp; game.groups[oppTeam] = grp === 'solid' ? 'stripe' : 'solid';
       game.open = false; continueTurn = true;
-      game.lastMsg = `${teamLabel(myTeam)} ficou com as ${grp === 'solid' ? 'lisas' : 'listradas'}.`;
+      game.lastMsg = T('msg.groups', { team: teamLabel(myTeam), group: T(grp === 'solid' ? 'grp.solids' : 'grp.stripes') });
     }
   } else if (!foul && !game.open && numbered.length) {
     const myGrp = game.groups[myTeam];
-    if (numbered.some((n) => groupName(n) === myGrp)) { continueTurn = true; game.lastMsg = `${playerName(shooter)} encaçapou e continua.`; }
-    else game.lastMsg = `${playerName(shooter)} encaçapou bola do adversário. Passa a vez.`;
+    if (numbered.some((n) => groupName(n) === myGrp)) { continueTurn = true; game.lastMsg = T('msg.continue', { name: playerName(shooter) }); }
+    else game.lastMsg = T('msg.oppBall', { name: playerName(shooter) });
   }
   let nextTurn, bih = false;
-  if (foul) { nextTurn = nextNo; bih = true; game.lastMsg = `Falta: ${reasons[0]}. ${playerName(nextNo)} joga com a bola na mão.`; }
+  if (foul) { nextTurn = nextNo; bih = true; game.lastMsg = T('msg.foul', { reason: reasons[0], name: playerName(nextNo) }); }
   else if (continueTurn) nextTurn = shooter;
-  else { nextTurn = nextNo; if (!game.lastMsg) game.lastMsg = `Vez de ${playerName(nextNo)}.`; }
+  else { nextTurn = nextNo; if (!game.lastMsg) game.lastMsg = T('msg.turnOf', { name: playerName(nextNo) }); }
   return { nextTurn, ballInHand: bih, foul };
 }
 
@@ -591,17 +591,17 @@ function send(o) { OrbitNet.send(o); }
 
 function handleNet(msg) {
   switch (msg.t) {
-    case '_neterror': setLobbyMsg(msg.msg || 'Erro de rede.'); break;
+    case '_neterror': setLobbyMsg(msg.msg || T('lm.netError')); break;
     case 'joined': // servidor (?server) ou host P2P local
       myNo = msg.playerNo; if (msg.slots) roomSlots = msg.slots;
-      setLobbyMsg(`Entrou como Jogador ${myNo}.` + (myNo === 1 ? ' Aguardando os outros jogadores...' : ''));
+      setLobbyMsg(T('lm.joined', { n: myNo }) + (myNo === 1 ? T('lm.waitingOthers') : ''));
       break;
     case 'assign': // host P2P atribuiu seu número/vagas da sala
       myNo = msg.playerNo; roomSlots = msg.slots || 2;
-      setLobbyMsg(`Entrou na sala como Jogador ${myNo}.`);
+      setLobbyMsg(T('lm.joinedRoom', { n: myNo }));
       break;
-    case 'waiting': setLobbyMsg(roomSlots === 4 ? 'Aguardando os 4 jogadores entrarem na sala...' : 'Aguardando o segundo jogador entrar na sala...'); break;
-    case 'full': setLobbyMsg('Sala cheia (ou partida já começou)! Tente outra sala.'); break;
+    case 'waiting': setLobbyMsg(roomSlots === 4 ? T('lm.waiting4') : T('lm.waiting2')); break;
+    case 'full': setLobbyMsg(T('lm.full')); break;
     case 'lobby': // roster do 2v2 mudou (entrou/saiu alguém)
       lobbyRoster = msg.players || []; roomSlots = msg.slots || roomSlots;
       renderTeamLobby();
@@ -628,12 +628,12 @@ function handleNet(msg) {
       }
       break;
     case 'peer_left':
-      if (!game.gameOver) setStatus((msg.no ? playerName(msg.no) : 'Adversário') + ' saiu — ele pode voltar entrando com o código da sala.');
+      if (!game.gameOver) setStatus(T('st.left', { name: msg.no ? playerName(msg.no) : T('default.opp') }));
       break;
     case 'rejoined': { // alguém RECONECTOU numa partida em andamento
       if (phase === 'lobby') break;
       if (msg.name && players[msg.no]) players[msg.no].name = msg.name;
-      setStatus(playerName(msg.no) + ' voltou à mesa!');
+      setStatus(T('st.rejoined', { name: playerName(msg.no) }));
       // O menor nº presente (excluindo quem voltou) é o responsável pelo snapshot.
       const senders = TURN_ORDER.filter((n) => n !== msg.no);
       if (myNo === Math.min(...senders)) queueResync(msg.no);
@@ -683,7 +683,7 @@ function applyResync(msg) {
   phase = currentTurn === myNo ? 'aim' : 'wait';
   if (window.OrbitAudio) OrbitAudio.startMusic();
   updateHUD();
-  setStatus('Reconectado! A partida continua. 🎱');
+  setStatus(T('st.reconnected'));
 }
 
 // Aplica a mensagem 'start' (1v1 legado ou 2v2 com times) e começa o jogo.
@@ -692,7 +692,7 @@ function applyStart(msg) {
     players = msg.players; TURN_ORDER = msg.order.slice(); roomSlots = 4;
   } else { // 1v1: monta o roster local a partir do nome do adversário
     const oppNo = myNo === 1 ? 2 : 1;
-    oppName = msg.opponent || 'Adversário';
+    oppName = msg.opponent || T('default.opp');
     players = {};
     players[myNo] = { name: myName, team: myNo };
     players[oppNo] = { name: oppName, team: oppNo };
@@ -721,12 +721,12 @@ function renderTeamLobby() {
   for (const p of lobbyRoster) {
     const row = document.createElement('div'); row.className = 'tlRow';
     const nm = document.createElement('span'); nm.className = 'tlName';
-    nm.textContent = p.name + (p.no === myNo ? ' (você)' : '') + (p.no === 1 ? ' 👑' : '');
+    nm.textContent = p.name + (p.no === myNo ? T('tl.you') : '') + (p.no === 1 ? ' 👑' : '');
     row.appendChild(nm);
     for (const t of [1, 2]) {
       const b = document.createElement('button');
       b.className = 'tlTeam t' + t + (teamSel[p.no] === t ? ' sel' : '');
-      b.textContent = t === 1 ? 'Time A' : 'Time B';
+      b.textContent = t === 1 ? T('tl.teamA') : T('tl.teamB');
       if (iAmHost) {
         b.addEventListener('click', () => {
           teamSel[p.no] = t;
@@ -740,7 +740,7 @@ function renderTeamLobby() {
   }
   for (let i = lobbyRoster.length; i < 4; i++) {
     const row = document.createElement('div'); row.className = 'tlRow empty';
-    row.innerHTML = '<span class="tlName">Aguardando jogador…</span>';
+    row.innerHTML = '<span class="tlName"></span>'; row.firstChild.textContent = T('tl.waitPlayer');
     list.appendChild(row);
   }
 
@@ -751,9 +751,9 @@ function renderTeamLobby() {
   st.style.display = iAmHost ? '' : 'none';
   st.disabled = !(full && balanced);
   document.getElementById('tlMsg').textContent = !full
-    ? `Aguardando jogadores (${lobbyRoster.length}/4)… Código da sala: ${roomInput}`
-    : (!balanced ? 'Os times precisam ter 2 jogadores cada.'
-      : (iAmHost ? 'Tudo pronto! Pode começar.' : 'Aguardando o host começar a partida…'));
+    ? T('tl.waiting', { n: lobbyRoster.length, code: roomInput })
+    : (!balanced ? T('tl.balance')
+      : (iAmHost ? T('tl.ready') : T('tl.waitHost')));
 }
 
 // Host: sorteia as duplas (2x2 aleatório).
@@ -805,6 +805,8 @@ const BIH_MOVE = 0.9;     // bola na mão: unidades por pixel
 const PULL_MAX = 300;     // puxada no feltro (toque)
 
 const amShooter = () => currentTurn === myNo && !game.gameOver;
+// Celular/tablet: dedo no lugar de mouse+teclado → botões touch no HUD.
+const IS_MOBILE = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
 // Pointer Lock persistente: o cursor fica OCULTO o tempo todo (só reaparece com
 // Esc) e recebemos movimento RELATIVO — gira o taco/câmera infinito, sem sair
 // da janela nem depender da posição do cursor.
@@ -845,7 +847,7 @@ function onMouseDown(e) {
   // cursor no feltro (visão de cima) — clique fixa e volta a travar pra mirar.
   if (ballInHand && amShooter() && phase === 'aim') {
     const f = screenToFelt(e.clientX, e.clientY);
-    if (f && placeCue(f.x, f.y)) { ballInHand = false; sendCue(true); setStatus('Bola posicionada. Mova o mouse para mirar.'); requestLock(); }
+    if (f && placeCue(f.x, f.y)) { ballInHand = false; sendCue(true); setStatus(T('st.placedAim')); requestLock(); }
     return;
   }
   if (!isLocked()) { requestLock(); return; } // 1º clique trava o cursor
@@ -913,7 +915,7 @@ function onKeyDown(e) {
     const i = OrbitAudio.prevMusic(); if (i) musicToast('♪ ' + i.title);
   } else if ((e.key === 'm' || e.key === 'M') && window.OrbitAudio && OrbitAudio.toggleMusic) {
     const i = OrbitAudio.toggleMusic();
-    if (i) musicToast(i.playing ? ('▶ ' + i.title) : '⏸ música pausada');
+    if (i) musicToast(i.playing ? ('▶ ' + i.title) : T('music.paused'));
   }
 }
 function onKeyUp(e) {
@@ -954,29 +956,80 @@ function setPowerUI(p) {
   const t = document.getElementById('powerPct'); if (t) t.textContent = pct;
 }
 
-// ---- Toque (sem Ctrl): 1 dedo = puxar a branca; 2 dedos = girar ------------
-let touchCharging = false;
+// ---- Toque (padrão 8 Ball Pool): arrastar na MESA gira o taco;
+// FORÇA no slider lateral; PINÇA = zoom. A decisão do que o arrasto faz é
+// tomada A CADA movimento (sem flag armada no touchstart — era frágil:
+// um toque fantasma de 2 dedos ou timing de fase matava o arrasto todo). ---
+const TOUCH_AIM_SENS = 0.005;    // rad por px de arrasto horizontal
+const TOUCH_PITCH_SENS = 0.0028; // altura da câmera por px vertical (na mira)
+// Órbita LIVRE de espectador (fora da sua vez): arrastar gira ao redor da mesa.
+let freeYaw = 0, freeElev = 1.34; // elev ~77° = equivalente à vista de cima antiga
+let pinch0 = 0, pinchZoom0 = 1;   // pinça: distância inicial e zoom na largada
+function touchDist(e) {
+  const a = e.touches[0], b = e.touches[1];
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+}
+const TDBG = { start: 0, move: 0, rot: 0, pinchN: 0, nT: 0, moved: 0, dx: 0 };
+// Posição anterior POR DEDO (identifier). Usamos changedTouches (só dedos que
+// SE MOVERAM) — imune a "toque fantasma" preso (comum em Samsung), que fazia
+// touches.length=2 e sequestrava o arrasto pro ramo da pinça.
+let tPrev = {};
 function onTouchStart(e) {
-  if (e.touches.length >= 2) { orbiting = true; lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY }; return; }
-  const t = e.touches[0]; lastMouse = { x: t.clientX, y: t.clientY };
-  if (amShooter() && phase === 'aim') {
-    if (ballInHand) { const f = screenToFelt(t.clientX, t.clientY); if (f && placeCue(f.x, f.y)) { ballInHand = false; sendCue(true); setStatus('Bola posicionada.'); } return; }
-    touchCharging = true; chargePower = 0; setPowerUI(0); return;
-  }
-  orbiting = true;
+  TDBG.start++;
+  for (const t of e.changedTouches) tPrev[t.identifier] = { x: t.clientX, y: t.clientY };
+  if (e.touches.length >= 2) { pinch0 = touchDist(e); pinchZoom0 = zoom; return; }
+  const t = e.touches[0];
+  lastMouse = { x: t.clientX, y: t.clientY };
+  // (bola na mão é tratada no touchmove/touchend — em alguns aparelhos o
+  // touchstart do canvas não chega com confiabilidade)
 }
 function onTouchMove(e) {
-  const t = e.touches[0]; const cur = { x: t.clientX, y: t.clientY };
-  if (touchCharging) {
-    const felt = screenToFelt(cur.x, cur.y);
-    if (felt) { const c = cue(); const dx = c.x - felt.x, dy = c.y - felt.y, d = Math.hypot(dx, dy); if (d > 3) { aimDir = { x: dx / d, y: dy / d }; chargePower = Math.max(0, Math.min(1, d / PULL_MAX)); } setPowerUI(chargePower); sendAim(); }
+  TDBG.move++; TDBG.nT = e.touches.length; TDBG.moved = e.changedTouches.length;
+  // PINÇA de verdade = DOIS dedos se movendo no mesmo evento.
+  if (e.touches.length >= 2 && e.changedTouches.length >= 2) {
+    TDBG.pinchN++;
+    if (!pinch0) { pinch0 = touchDist(e); pinchZoom0 = zoom; return; }
+    zoom = Math.max(0.6, Math.min(1.8, pinchZoom0 * (pinch0 / touchDist(e))));
+    saveViewPrefs();
+    for (const t of e.changedTouches) tPrev[t.identifier] = { x: t.clientX, y: t.clientY };
     return;
   }
-  lastMouse = cur; // câmera é automática (taco/topo); toque só mira/atira
+  // Senão: gira com o dedo que SE MOVEU (mesmo que exista outro toque parado).
+  const t = e.changedTouches[0];
+  if (!t) return;
+  const p = tPrev[t.identifier] || { x: t.clientX, y: t.clientY };
+  const dx = t.clientX - p.x, dy = t.clientY - p.y;
+  tPrev[t.identifier] = { x: t.clientX, y: t.clientY };
+  if (Math.abs(dx) > 90 || Math.abs(dy) > 90) return; // salto: ignora
+  if (amShooter() && phase === 'aim' && ballInHand) {
+    // BOLA NA MÃO: a branca segue o dedo (solta no touchend p/ fixar)
+    const f = screenToFelt(t.clientX, t.clientY);
+    if (f) {
+      const c = cue();
+      c.x = Math.max(R + 1, Math.min(W - R - 1, f.x));
+      c.y = Math.max(R + 1, Math.min(H - R - 1, f.y));
+      c.potted = false; c._px = c.x; c._py = c.y;
+      sendCue();
+    }
+  } else if (amShooter() && phase === 'aim') {
+    TDBG.rot++; TDBG.dx = dx;
+    setAim(aimAngle + dx * TOUCH_AIM_SENS);                                // lado = gira taco/câmera
+    camPitch = Math.max(0, Math.min(1, camPitch - dy * TOUCH_PITCH_SENS)); // ↑↓ = altura (só visual)
+    saveViewPrefs(); sendAim();
+  }
+  // fora da sua vez / vista de cima: a mesa fica PARADA (só a pinça dá zoom)
 }
-function onTouchEnd() {
-  if (touchCharging) { touchCharging = false; setPowerUI(0); const pw = chargePower; chargePower = 0; if (pw > 0.05) shoot(pw); return; }
+function onTouchEnd(e) {
+  if (e && e.changedTouches) for (const t of e.changedTouches) delete tPrev[t.identifier];
+  if (e && e.touches && e.touches.length < 2) pinch0 = 0;
   orbiting = false;
+  // BOLA NA MÃO: soltar o dedo fixa a branca (tap = arrasto de 0px, também vale)
+  if (amShooter() && phase === 'aim' && ballInHand && e && e.changedTouches && e.changedTouches[0]) {
+    const t = e.changedTouches[0];
+    const f = screenToFelt(t.clientX, t.clientY);
+    if (f && placeCue(f.x, f.y)) { ballInHand = false; sendCue(true); setStatus('Bola posicionada.'); }
+    else setStatus('Esse lugar está ocupado — solta noutro ponto.');
+  }
 }
 let lastAimSent = 0;
 function sendAim() {
@@ -995,9 +1048,12 @@ function shoot(power) {
   // squirtedDir aqui dobraria a deflexão e descasaria da linha de mira).
   const dir = Physics.squirtedDir(aimDir, cueOffset.a); // só p/ fallback de miscue
   let strike = Physics.cueStrike(power, aimDir, cueOffset.a, cueOffset.b);
-  if (strike.miscue) { strike = { vx: dir.x * power * MAX_SHOT * 0.15, vy: dir.y * power * MAX_SHOT * 0.15, wx: 0, wy: 0, wz: 0 }; game.lastMsg = 'Miscue! Tacada fraca.'; }
+  if (strike.miscue) { strike = { vx: dir.x * power * MAX_SHOT * 0.15, vy: dir.y * power * MAX_SHOT * 0.15, wx: 0, wy: 0, wz: 0 }; game.lastMsg = T('msg.miscue'); }
   c.vx = strike.vx; c.vy = strike.vy; c.wx = strike.wx; c.wy = strike.wy; c.wz = strike.wz;
   cueOffset = { a: 0, b: 0 }; endContact(); updateContactDot(); // efeito reseta ao centro após a tacada
+  // mobile: fecha a bola de efeito, se estava aberta
+  const ctEl = document.getElementById('contact'); if (ctEl) ctEl.classList.remove('show');
+  const msB = document.getElementById('mbSpin'); if (msB) msB.classList.remove('on');
   const snapshot = balls.map((b) => ({ n: b.n, x: b.x, y: b.y, vx: b.vx, vy: b.vy, wx: b.wx, wy: b.wy, wz: b.wz, potted: b.potted }));
   const shot = Physics.simulateShot(snapshot);
   send({ t: 'shot', segments: shot.segments, duration: shot.duration, events: shot.events, cueSpeed: shot.cueSpeed, finalBalls: shot.finalBalls });
@@ -1029,6 +1085,11 @@ function updateAimVisuals() {
   const showOpp = !amShooter() && phase === 'wait' && oppAim;
   // Widgets de força e efeito só aparecem na sua vez de mirar.
   document.getElementById('cueControls').classList.toggle('show', showMine);
+  if (IS_MOBILE) {
+    document.body.classList.toggle('ingame', phase !== 'lobby');
+    const sb = document.getElementById('powerSlider');
+    if (sb) sb.classList.toggle('show', showMine);
+  }
   if (!showMine && !showOpp) { hideAim(); return; }
   const c = cue(); if (!c || c.potted) { hideAim(); return; }
   const dir = showMine ? aimDir : { x: Math.cos(oppAim.ang), y: Math.sin(oppAim.ang) };
@@ -1092,16 +1153,17 @@ function buildDashes(oppTeam, myTeam) {
 function bannerText() {
   if (game.gameOver) {
     return game.winner === teamOf(myNo)
-      ? (roomSlots === 4 ? 'SEU TIME VENCEU' : 'VOCÊ VENCEU')
-      : 'FIM DE JOGO';
+      ? (roomSlots === 4 ? T('ban.teamWon') : T('ban.youWon'))
+      : T('ban.gameOver');
   }
   if (currentTurn === myNo) {
-    if (ballInHand) return 'BOLA NA MÃO';
-    if (!isLocked()) return 'CLIQUE PARA MIRAR';
-    return 'SUA VEZ';
+    if (ballInHand) return IS_MOBILE ? T('ban.bihTouch') : T('ban.bih');
+    if (IS_MOBILE) return T('ban.yourTurnDrag');
+    if (!isLocked()) return T('ban.clickAim');
+    return T('ban.yourTurn');
   }
   const nm = playerName(currentTurn).toUpperCase();
-  return 'VEZ DE ' + nm + (roomSlots === 4 && teamOf(currentTurn) === teamOf(myNo) ? ' (SUA DUPLA)' : '');
+  return T('ban.turnOf', { name: nm }) + (roomSlots === 4 && teamOf(currentTurn) === teamOf(myNo) ? T('ban.partner') : '');
 }
 
 function updateHUD() {
@@ -1123,11 +1185,11 @@ function updateHUD() {
   for (const [side, team] of [['L', oppTeam], ['R', myTeam]]) {
     const g = game.groups[team];
     const rem = g ? remainingOfGroup(g) : 0;
-    document.getElementById('grp' + side).textContent = !g ? 'mesa aberta' : (g === 'solid' ? ('lisas · ' + rem) : ('listradas · ' + rem));
+    document.getElementById('grp' + side).textContent = !g ? T('grp.open') : (T(g === 'solid' ? 'grp.solids' : 'grp.stripes') + ' · ' + rem);
     buildChips(document.getElementById('chips' + side), g);
   }
 
-  document.getElementById('sbSeries').textContent = 'MELHOR DE ' + SERIES_GAMES;
+  document.getElementById('sbSeries').textContent = T('sb.series', { n: SERIES_GAMES });
   document.getElementById('scoreL').textContent = matchScore[oppTeam];
   document.getElementById('scoreR').textContent = matchScore[myTeam];
   buildDashes(oppTeam, myTeam);
@@ -1160,22 +1222,28 @@ function showEnd() {
   matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
   matchOver = matchScore[game.winner] >= SERIES_TARGET;
   const won = game.winner === teamOf(myNo); // vitória do SEU time (1v1: você)
-  const we = roomSlots === 4 ? 'Seu time' : 'Você';
   if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
-  const t = document.getElementById('endTitle'), m = document.getElementById('endMsg'), btn = document.getElementById('rematchBtn');
-  if (matchOver) {
-    t.textContent = won ? `🏆 ${we} venceu o melhor de 5!` : `😞 ${we} perdeu o melhor de 5`;
-    m.textContent = `Placar final: ${matchScore[1]} – ${matchScore[2]}. ${game.lastMsg}`;
-    btn.textContent = 'Nova série';
-  } else {
-    t.textContent = won ? `🎉 ${we} venceu a partida!` : `${we} perdeu a partida`;
-    m.textContent = `${game.lastMsg} Placar da série: ${matchScore[1]} – ${matchScore[2]}.`;
-    btn.textContent = 'Próxima partida';
-  }
+  endWon = won;
+  renderEndTexts();
   document.getElementById('rematchMsg').textContent = '';
   document.getElementById('endOverlay').classList.remove('hidden');
   phase = 'ended';
   updateHUD();
+}
+// Textos do overlay de fim (função própria: retraduz se o idioma mudar).
+let endWon = false;
+function renderEndTexts() {
+  const who = roomSlots === 4 ? 'team' : 'you'; // conjugação correta por idioma
+  const el = document.getElementById('endTitle'), m = document.getElementById('endMsg'), btn = document.getElementById('rematchBtn');
+  if (matchOver) {
+    el.textContent = T((endWon ? 'end.wonSeries.' : 'end.lostSeries.') + who);
+    m.textContent = T('end.finalScore', { a: matchScore[1], b: matchScore[2] }) + ' ' + game.lastMsg;
+    btn.textContent = T('btn.newSeries');
+  } else {
+    el.textContent = T((endWon ? 'end.wonGame.' : 'end.lostGame.') + who);
+    m.textContent = game.lastMsg + ' ' + T('end.seriesScore', { a: matchScore[1], b: matchScore[2] });
+    btn.textContent = T('btn.nextGame');
+  }
 }
 function doRematch(initiator) {
   if (matchOver) { matchScore = { 1: 0, 2: 0 }; matchOver = false; } // fim da série → zera para a próxima
@@ -1189,7 +1257,7 @@ function doRematch(initiator) {
 function getNameOrWarn() {
   const v = (document.getElementById('name').value || '').trim().slice(0, 20);
   if (!v) {
-    setLobbyMsg('✍️ Digite seu nome para jogar.');
+    setLobbyMsg(T('lm.nameRequired'));
     const el = document.getElementById('name'); el.classList.add('err'); el.focus();
     return null;
   }
@@ -1200,7 +1268,7 @@ function startSolo(level) {
   if (window.OrbitAudio) OrbitAudio.unlock();
   const nm = getNameOrWarn(); if (!nm) return;
   myName = nm;
-  myNo = 1; botLevel = level; oppName = BOT_NAMES[level] || 'Bot';
+  myNo = 1; botLevel = level; oppName = botName(level);
   roomSlots = 2; iAmHost = false;
   players = { 1: { name: nm, team: 1 }, 2: { name: oppName, team: 2 } };
   TURN_ORDER = [1, 2];
@@ -1217,7 +1285,7 @@ function maybeBotTurn() {
 function botTurn() {
   if (!botLevel || game.gameOver || currentTurn !== BOT_NO || phase === 'sim') return;
   const hint = document.getElementById('turnHint');
-  if (hint) hint.textContent = '🤖 ' + oppName + ' está pensando…';
+  if (hint) hint.textContent = T('st.botThinking', { name: oppName });
   // Deixa o "pensando" pintar antes do cálculo (que pode travar ~0.3s nos níveis altos).
   setTimeout(() => {
     if (!botLevel || game.gameOver || currentTurn !== BOT_NO || phase === 'sim') return;
@@ -1430,9 +1498,7 @@ function init() {
     document.getElementById('roomCodeVal').textContent = roomInput;
     document.getElementById('roomShare').hidden = false;
     lockInputs();
-    setLobbyMsg(slots === 4
-      ? 'Sala 2v2 criada. Envie o código para os outros 3 jogadores...'
-      : 'Sala criada. Aguardando o adversário entrar com o código...');
+    setLobbyMsg(slots === 4 ? T('lm.created4') : T('lm.created2'));
     hostRoom(slots);
   };
   document.getElementById('createBtn').addEventListener('click', () => createRoom(2));
@@ -1446,22 +1512,133 @@ function init() {
     if (window.OrbitAudio) OrbitAudio.unlock();
     const nm = getNameOrWarn(); if (!nm) return;
     const code = (document.getElementById('joinCode').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (code.length < 3) { setLobbyMsg('Digite o código da sala que o host te enviou.'); return; }
+    if (code.length < 3) { setLobbyMsg(T('lm.enterCode')); return; }
     botLevel = null; myName = nm; roomInput = code;
     lockInputs();
-    setLobbyMsg('Conectando à sala ' + code + '...'); joinRoom();
+    setLobbyMsg(T('lm.connectingRoom', { code: code })); joinRoom();
   });
   document.getElementById('copyCodeBtn').addEventListener('click', () => {
     const code = document.getElementById('roomCodeVal').textContent;
     const btn = document.getElementById('copyCodeBtn');
-    const done = () => { btn.textContent = 'Copiado!'; setTimeout(() => { btn.textContent = 'Copiar'; }, 1500); };
+    const done = () => { btn.textContent = T('btn.copied'); setTimeout(() => { btn.textContent = T('btn.copy'); }, 1500); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done).catch(done);
     else done();
   });
   document.getElementById('joinCode').addEventListener('input', (e) => { e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ''); });
 
-  document.getElementById('rematchBtn').addEventListener('click', () => { document.getElementById('rematchMsg').textContent = 'Aguardando o adversário...'; doRematch(true); });
+  document.getElementById('rematchBtn').addEventListener('click', () => { document.getElementById('rematchMsg').textContent = T('end.waitingOpp'); doRematch(true); });
   document.getElementById('ctrlBtn').addEventListener('click', toggleControls);
+
+  // ================= CONTROLES TOUCH (só no celular) =================
+  if (IS_MOBILE) {
+    document.body.classList.add('mobile');
+    const $ = (id) => document.getElementById(id);
+    // ☰ menu de pausa
+    $('mbMenu').addEventListener('click', () => { if (window.OrbitMenu) OrbitMenu.open(); });
+    // 🔝 ver de cima (toggle, não precisa segurar como o Tab)
+    $('mbTop').addEventListener('click', () => {
+      topOverride = !topOverride;
+      $('mbTop').classList.toggle('on', topOverride);
+    });
+    // 📷 altura da câmera: alterna rente → padrão → alto
+    $('mbCam').addEventListener('click', () => {
+      camPitch = camPitch < 0.3 ? 0.48 : (camPitch < 0.7 ? 0.9 : 0.12);
+      saveViewPrefs();
+    });
+    // 🎯 efeito: abre a bola grande; arrasta nela p/ escolher o ponto
+    $('mbSpin').addEventListener('click', () => {
+      const c = document.getElementById('contact');
+      c.classList.toggle('show');
+      $('mbSpin').classList.toggle('on', c.classList.contains('show'));
+    });
+    // 🎵 próxima música
+    $('mbMusic').addEventListener('click', () => {
+      if (window.OrbitAudio && OrbitAudio.nextMusic) { const i = OrbitAudio.nextMusic(); if (i) musicToast('♪ ' + i.title); }
+    });
+    // Toque na BOLA DE EFEITO: posição absoluta do dedo vira (a,b)
+    const contactEl = document.getElementById('contact');
+    const setSpinFromTouch = (ev) => {
+      const t = ev.touches ? ev.touches[0] : ev;
+      const r = contactEl.getBoundingClientRect();
+      let a = ((t.clientX - r.left) / r.width - 0.5) * 2 * Physics.MAX_OFFSET * 1.15;
+      let b = -((t.clientY - r.top) / r.height - 0.5) * 2 * Physics.MAX_OFFSET * 1.15;
+      const m = Math.hypot(a, b), MX = Physics.MAX_OFFSET;
+      if (m > MX) { a = a / m * MX; b = b / m * MX; }
+      cueOffset = { a, b }; updateContactDot();
+      ev.preventDefault();
+    };
+    contactEl.addEventListener('touchstart', setSpinFromTouch, { passive: false });
+    contactEl.addEventListener('touchmove', setSpinFromTouch, { passive: false });
+    // SLIDER DE FORÇA (estilo 8 Ball Pool): pressiona o trilho, PUXA PRA
+    // BAIXO até a força desejada e SOLTA = tacada. Voltar ao topo cancela.
+    const slider = $('powerSlider'), track = $('psTrack'),
+          fill = $('psFill'), handle = $('psHandle'), psPct = $('psPct');
+    let charging = false;
+    const setSlider = (pw) => {
+      fill.style.height = (pw * 100) + '%';
+      handle.style.top = (pw * 100) + '%';
+      psPct.textContent = Math.round(pw * 100) + '%';
+      psPct.style.top = (pw * 100) + '%';
+    };
+    const powerFromTouch = (ev) => {
+      const r = track.getBoundingClientRect();
+      return Math.max(0, Math.min(1, (ev.touches[0].clientY - r.top) / r.height));
+    };
+    slider.addEventListener('touchstart', (ev) => {
+      ev.preventDefault();
+      if (!(amShooter() && phase === 'aim' && !ballInHand)) return;
+      charging = true; slider.classList.add('on');
+      chargePower = powerFromTouch(ev); setPowerUI(chargePower); setSlider(chargePower); sendAim();
+    }, { passive: false });
+    slider.addEventListener('touchmove', (ev) => {
+      ev.preventDefault();
+      if (!charging) return;
+      chargePower = powerFromTouch(ev); setPowerUI(chargePower); setSlider(chargePower); sendAim();
+    }, { passive: false });
+    const releaseShot = (ev) => {
+      if (ev) ev.preventDefault();
+      if (!charging) return;
+      charging = false; slider.classList.remove('on');
+      const pw = chargePower; chargePower = 0; setPowerUI(0); setSlider(0);
+      if (pw > 0.05) shoot(pw); else sendAim(); // soltar no topo = cancela
+    };
+    slider.addEventListener('touchend', releaseShot, { passive: false });
+    slider.addEventListener('touchcancel', releaseShot, { passive: false });
+  }
+
+  // Troca de idioma: re-renderiza os textos dinâmicos na hora.
+  document.addEventListener('orbitpool:lang', () => {
+    if (phase !== 'lobby') updateHUD();
+    renderTeamLobby();
+    if (phase === 'ended') renderEndTexts();
+  });
+
+  // ---- DEBUG de toque (abra com ?touchdebug na URL) ----------------------
+  if (/[?&]touchdebug/.test(location.search)) {
+    const d = document.createElement('div');
+    d.style.cssText = 'position:fixed;left:4px;top:4px;z-index:999;background:rgba(0,0,0,.85);color:#0f0;' +
+      'font:11px/1.5 monospace;padding:8px;pointer-events:none;white-space:pre;border-radius:6px;max-width:94vw';
+    document.body.appendChild(d);
+    let ts = 0, tm = 0, lastTarget = '-', lastDx = 0;
+    canvas.addEventListener('touchstart', () => { ts++; }, true);
+    canvas.addEventListener('touchmove', () => { tm++; }, true);
+    // quem está RECEBENDO os toques? (capture na janela vê tudo)
+    window.addEventListener('touchstart', (e) => {
+      const t = e.target;
+      lastTarget = (t.id ? '#' + t.id : t.tagName) + (t === canvas ? ' (canvas ✓)' : ' (INTERCEPTADO!)');
+    }, true);
+    window.addEventListener('touchmove', (e) => {
+      if (e.touches && e.touches[0]) lastDx = e.touches[0].clientX;
+    }, true);
+    (function upd() {
+      d.textContent =
+        'canvas ts:' + ts + '  tm:' + tm + '  alvo: ' + lastTarget + '\n' +
+        'DENTRO: start:' + TDBG.start + ' move:' + TDBG.move + ' rot:' + TDBG.rot + ' pinça:' + TDBG.pinchN + '\n' +
+        'nTouches:' + TDBG.nT + ' moved:' + TDBG.moved + ' dx:' + (+TDBG.dx).toFixed(1) + '\n' +
+        'shooter:' + amShooter() + ' phase:' + phase + ' bih:' + ballInHand + ' ang:' + aimAngle.toFixed(3);
+      requestAnimationFrame(upd);
+    })();
+  }
 
   requestAnimationFrame(loop);
 }

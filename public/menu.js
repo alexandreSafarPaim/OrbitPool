@@ -71,6 +71,10 @@ window.OrbitMenu = (function () {
 
   function h(tag, cls, html) { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; }
   function pct(v) { return Math.round(v * 100) + '%'; }
+  // i18n: T(chave) traduz; i18nEl marca o elemento p/ retradução automática
+  // quando o idioma muda (OrbitI18N.apply varre os data-i18n).
+  const T = (k, p) => (window.OrbitI18N ? OrbitI18N.t(k, p) : k);
+  function i18nEl(el, key) { el.setAttribute('data-i18n', key); return el; }
 
   function build() {
     const style = document.createElement('style'); style.textContent = CSS; document.head.appendChild(style);
@@ -79,11 +83,11 @@ window.OrbitMenu = (function () {
     // --- Pausa ---
     pause = h('div', 'obm-ovl');
     const pc = h('div', 'obm-card');
-    pc.appendChild(h('h2', null, '⏸ Pausa'));
-    pc.appendChild(h('p', 'obm-sub', 'Jogo pausado'));
-    const bResume = h('button', 'obm-btn', 'Continuar');
-    const bSettings = h('button', 'obm-btn ghost', '⚙ Configurações');
-    const bQuit = h('button', 'obm-btn danger', 'Sair');
+    pc.appendChild(i18nEl(h('h2', null, T('menu.pause')), 'menu.pause'));
+    pc.appendChild(i18nEl(h('p', 'obm-sub', T('menu.paused')), 'menu.paused'));
+    const bResume = i18nEl(h('button', 'obm-btn', T('menu.resume')), 'menu.resume');
+    const bSettings = i18nEl(h('button', 'obm-btn ghost', T('menu.settings')), 'menu.settings');
+    const bQuit = i18nEl(h('button', 'obm-btn danger', T('menu.quit')), 'menu.quit');
     bResume.onclick = close;
     bSettings.onclick = showSettings;
     bQuit.onclick = () => { if (opts.onQuit) opts.onQuit(); else location.reload(); };
@@ -93,23 +97,36 @@ window.OrbitMenu = (function () {
     // --- Configurações ---
     settings = h('div', 'obm-ovl');
     const sc = h('div', 'obm-card');
-    sc.appendChild(h('h2', null, '⚙ Configurações'));
-    sc.appendChild(h('p', 'obm-sub', 'Ajustes salvos automaticamente'));
+    sc.appendChild(i18nEl(h('h2', null, T('menu.settings')), 'menu.settings'));
+    sc.appendChild(i18nEl(h('p', 'obm-sub', T('menu.autoSaved')), 'menu.autoSaved'));
 
-    sc.appendChild(slider('Volume geral', () => OrbitAudio.getVolume('master'), (v) => OrbitAudio.setVolume('master', v)));
-    sc.appendChild(slider('Efeitos sonoros', () => OrbitAudio.getVolume('sfx'), (v) => OrbitAudio.setVolume('sfx', v)));
-    sc.appendChild(slider('Música', () => OrbitAudio.getVolume('music'), (v) => OrbitAudio.setVolume('music', v)));
+    // Idioma (troca aplicada na hora e persistida)
+    if (window.OrbitI18N) {
+      const langRow = h('div', 'obm-row');
+      const lab = h('label');
+      const name = document.createElement('span');
+      name.textContent = T('lang.label'); name.setAttribute('data-i18n', 'lang.label');
+      lab.appendChild(name);
+      const dd = document.createElement('div');
+      OrbitI18N.customSelect(dd, { wide: true }); // dropdown personalizado (mesmo do lobby)
+      langRow.append(lab, dd);
+      sc.appendChild(langRow);
+    }
 
-    const sensXRow = slider('Sensibilidade horizontal (mira)', () => (OrbitSettings.sensitivityX() - 0.25) / 2.25,
+    sc.appendChild(slider('menu.volMaster', () => OrbitAudio.getVolume('master'), (v) => OrbitAudio.setVolume('master', v)));
+    sc.appendChild(slider('menu.volSfx', () => OrbitAudio.getVolume('sfx'), (v) => OrbitAudio.setVolume('sfx', v)));
+    sc.appendChild(slider('menu.volMusic', () => OrbitAudio.getVolume('music'), (v) => OrbitAudio.setVolume('music', v)));
+
+    const sensXRow = slider('menu.sensX', () => (OrbitSettings.sensitivityX() - 0.25) / 2.25,
       (t) => OrbitSettings.setSensitivityX(0.25 + t * 2.25), () => OrbitSettings.sensitivityX().toFixed(2) + '×');
     sensXRow.classList.add('obm-only3d');
     sc.appendChild(sensXRow);
-    const sensYRow = slider('Sensibilidade vertical (câmera)', () => (OrbitSettings.sensitivityY() - 0.25) / 2.25,
+    const sensYRow = slider('menu.sensY', () => (OrbitSettings.sensitivityY() - 0.25) / 2.25,
       (t) => OrbitSettings.setSensitivityY(0.25 + t * 2.25), () => OrbitSettings.sensitivityY().toFixed(2) + '×');
     sensYRow.classList.add('obm-only3d');
     sc.appendChild(sensYRow);
 
-    const bBack = h('button', 'obm-btn', 'Voltar');
+    const bBack = i18nEl(h('button', 'obm-btn', T('menu.back')), 'menu.back');
     bBack.onclick = showPause;
     sc.appendChild(bBack);
     settings.appendChild(sc);
@@ -119,9 +136,11 @@ window.OrbitMenu = (function () {
   }
 
   // getVal/setVal em 0..1; fmt opcional para o texto do valor.
-  function slider(label, getVal, setVal, fmt) {
+  // labelKey é uma CHAVE de tradução (i18n.js) — o texto acompanha o idioma.
+  function slider(labelKey, getVal, setVal, fmt) {
     const row = h('div', 'obm-row');
-    const lab = h('label'); const name = document.createElement('span'); name.textContent = label;
+    const lab = h('label'); const name = document.createElement('span');
+    name.textContent = T(labelKey); name.setAttribute('data-i18n', labelKey);
     const val = document.createElement('b'); lab.append(name, val);
     const inp = document.createElement('input'); inp.type = 'range'; inp.min = 0; inp.max = 1; inp.step = 0.01;
     const sync = () => { const g = getVal(); inp.value = g; val.textContent = fmt ? fmt() : pct(g); };

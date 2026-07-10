@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <!-- ============ SEO ============ -->
   <title>OrbitPool — Sinuca 8-Ball 3D Multiplayer Online Grátis</title>
@@ -16,15 +16,15 @@
   <meta name="apple-mobile-web-app-title" content="OrbitPool" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="mobile-web-app-capable" content="yes" />
-  <link rel="canonical" href="https://orbitpool.netlify.app/" />
+  <link rel="canonical" href="https://orbitpool.pages.dev/" />
 
   <!-- Open Graph (Facebook, WhatsApp, LinkedIn, Discord…) -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="OrbitPool" />
   <meta property="og:title" content="OrbitPool — Sinuca 8-Ball 3D Multiplayer Online" />
   <meta property="og:description" content="Jogue sinuca 8-Ball 3D com um amigo direto no navegador, de graça e sem cadastro. Crie uma sala, mande o código e joguem em tempo real." />
-  <meta property="og:url" content="https://orbitpool.netlify.app/" />
-  <meta property="og:image" content="https://orbitpool.netlify.app/og-image.jpg" />
+  <meta property="og:url" content="https://orbitpool.pages.dev/" />
+  <meta property="og:image" content="https://orbitpool.pages.dev/og-image.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
   <meta property="og:image:alt" content="OrbitPool — sinuca 3D multiplayer" />
@@ -34,7 +34,7 @@
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="OrbitPool — Sinuca 8-Ball 3D Multiplayer Online" />
   <meta name="twitter:description" content="Jogue sinuca 8-Ball 3D com um amigo direto no navegador, de graça e sem cadastro." />
-  <meta name="twitter:image" content="https://orbitpool.netlify.app/og-image.jpg" />
+  <meta name="twitter:image" content="https://orbitpool.pages.dev/og-image.jpg" />
 
   <!-- Ícones / manifest -->
   <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
@@ -49,8 +49,8 @@
     "name": "OrbitPool",
     "alternateName": "OrbitPool — Bilhar 3D",
     "description": "Jogo de sinuca (8-Ball) 3D multiplayer online e gratuito, jogável no navegador via conexão P2P, sem instalação nem cadastro.",
-    "url": "https://orbitpool.netlify.app/",
-    "image": "https://orbitpool.netlify.app/og-image.jpg",
+    "url": "https://orbitpool.pages.dev/",
+    "image": "https://orbitpool.pages.dev/og-image.jpg",
     "inLanguage": "pt-BR",
     "genre": ["Sports", "Casual", "Multiplayer"],
     "gamePlatform": "Web Browser",
@@ -70,8 +70,10 @@
     :root { --accent:#ffd24a; --cream:#e8d9b5; --creamdim:#cbb892; --creamtxt:#b7a988;
       --chalk1:#2f3b34; --chalk2:#1c241f; --wood1:#7a4a1e; --wood2:#5a3413; --ink:#3a1e05; }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #0a0b0d;
-      font-family: 'Kalam', cursive; color: #f4f6f8; }
-    #c { position: fixed; inset: 0; display: block; }
+      font-family: 'Kalam', cursive; color: #f4f6f8; overscroll-behavior: none; }
+    /* touch-action:none é ESSENCIAL: sem isso o navegador mobile "come" os
+       touchmove p/ gestos nativos (pull-to-refresh etc.) e o arrasto morre */
+    #c { position: fixed; inset: 0; display: block; touch-action: none; }
     button { cursor: pointer; }
     button:disabled { opacity: .5; cursor: default; }
     a { color: var(--accent); text-decoration: none; } a:hover { color: #ffe08a; }
@@ -98,7 +100,7 @@
         repeating-linear-gradient(90deg, transparent 0 63px, rgba(0,0,0,.22) 63px 65px),
         linear-gradient(135deg, #1b3a2e 0%, #14322a 40%, #10241f 100%); }
     .overlay.hidden { display: none; }
-    #teamLobby, #endOverlay { background: rgba(6,10,8,.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    #teamLobby, #endOverlay, #gpuModal { background: rgba(6,10,8,.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
     .panel { position: relative; padding: 30px 30px 26px; width: min(92vw, 420px); text-align: center;
       border-radius: 14px; border: 9px solid transparent;
       background:
@@ -115,6 +117,9 @@
     .panel button:hover { transform: translateY(1px); box-shadow: 0 4px 0 #a86a10, 0 8px 18px rgba(0,0,0,.4); }
     .msg { color: var(--creamdim); font-size: 14px; min-height: 18px; margin: 12px 0 0; }
     .hint { color: #9c8f74; font-size: 12.5px; margin-top: 12px; line-height: 1.5; }
+    .gpuSteps { margin: 6px 0 2px; padding: 10px 12px; border-radius: 9px; background: rgba(0,0,0,.35);
+      border: 1px dashed rgba(255,210,74,.4); font-family: 'Oswald', sans-serif; font-size: 13.5px;
+      letter-spacing: .03em; color: var(--accent); user-select: all; }
 
     /* lobby de DUPLAS */
     .tlPanel { min-width: 340px; max-width: 460px; }
@@ -125,7 +130,7 @@
     .tlName { flex: 1; text-align: left; font-family: 'Permanent Marker', cursive; font-size: 14px; color: #f3ecdb; }
     .tlTeam { margin: 0; padding: 6px 12px; border-radius: 8px; font-family: 'Oswald', sans-serif; font-weight: 700;
       font-size: 12px; letter-spacing: .04em; background: rgba(255,255,255,.06);
-      border: 1.5px solid rgba(255,255,255,.14); color: #9aa79b; }
+      border: 1.5px solid rgba(255,255,255,.14); color: #9aa79b; width: auto; margin-top: 0; box-shadow: none; }
     .tlTeam.t1.sel { background: rgba(92,224,122,.2); border-color: #5ce07a; color: #8af0a2; }
     .tlTeam.t2.sel { background: rgba(143,227,255,.18); border-color: #8fe3ff; color: #b8ecff; }
     .tlBtns { display: flex; gap: 10px; justify-content: center; }
@@ -137,9 +142,6 @@
     /* ===================== LOBBY (menu do boteco) ===================== */
     #lobby { display: block; overflow: hidden; user-select: none; }
     #lobby.hidden { display: none; } /* id vence .overlay.hidden — precisa reafirmar */
-    .gpuSteps { margin: 6px 0 2px; padding: 10px 12px; border-radius: 9px; background: rgba(0,0,0,.35);
-      border: 1px dashed rgba(255,210,74,.4); font-family: 'Oswald', sans-serif; font-size: 13.5px;
-      letter-spacing: .03em; color: var(--accent); user-select: all; }
     #lobby .warmlight { position:absolute; top:-120px; left:50%; transform:translateX(-50%); width:900px; height:520px;
       background:radial-gradient(circle, rgba(255,180,70,.22), transparent 66%); filter:blur(10px); pointer-events:none; }
     #lobby .vignette { position:absolute; inset:0; background:radial-gradient(120% 80% at 50% 0%, transparent 40%, rgba(0,0,0,.5) 100%); pointer-events:none; }
@@ -242,15 +244,11 @@
     #hud { position: fixed; inset: 0; pointer-events: none; z-index: 10; font-family: 'Kalam', cursive; }
     .glass { background: rgba(20,50,42,.55); border: 1.5px dashed rgba(255,210,74,.45);
       backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
-
-    /* brand neon */
     #brand { position: absolute; top: 20px; left: 24px; padding: 8px 18px 10px; border-radius: 14px; }
     #brand .ball { display: none; }
     #brand .name { font-family: 'Pacifico', cursive; font-weight: 400; font-size: 24px; line-height: 1.15; color: #ffe9a8;
       text-shadow: 0 0 5px #ffd24a, 0 0 14px #ff9d2a, 0 0 26px rgba(255,120,20,.6); animation: btcNeon 5s infinite; }
     #brand .name b { color: #ffe9a8; }
-
-    /* placar quadro-negro */
     #scoreboard { position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
       display: flex; align-items: stretch; padding: 8px; border-radius: 20px; border: none;
       background: linear-gradient(135deg, var(--wood1), var(--wood2));
@@ -301,8 +299,6 @@
     .scoreRow .dash { font-family: 'Kalam', cursive; font-size: 18px; color: #6b6250; line-height: 1; }
     #dashes { display: flex; gap: 4px; margin-top: 7px; }
     #dashes i { width: 16px; height: 4px; border-radius: 2px; background: rgba(255,255,255,.16); }
-
-    /* controles (topo direita) */
     #ctrlWrap { position: absolute; top: 20px; right: 24px; display: flex; flex-direction: column; align-items: flex-end; gap: 8px; pointer-events: auto; }
     #ctrlBtn { display: flex; align-items: center; gap: 8px; padding: 9px 14px; border-radius: 12px;
       background: rgba(20,50,42,.55); border: 1.5px dashed rgba(255,210,74,.45);
@@ -320,8 +316,6 @@
     .krow .k { flex: none; min-width: 58px; text-align: center; font-family: 'Oswald', sans-serif; font-weight: 600;
       font-size: 11.5px; color: #1a1208; background: var(--cream); padding: 5px 8px; border-radius: 6px; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
     .krow .d { font-size: 14px; color: #d8cbb2; line-height: 1.25; }
-
-    /* banner da vez (baixo centro) */
     #turnWrap { position: absolute; bottom: 26px; left: 50%; transform: translateX(-50%);
       display: flex; flex-direction: column; align-items: center; gap: 8px; }
     #turnPill { display: flex; align-items: center; gap: 12px; padding: 11px 22px; border-radius: 999px;
@@ -332,8 +326,6 @@
     #statusText { font-family: 'Permanent Marker', cursive; font-size: 19px; letter-spacing: .02em; color: #f3ecdb; }
     #turnPill.mine #statusText { color: #ffe9a8; }
     #turnHint { font-size: 15px; color: #e6d9c4; text-shadow: 0 2px 6px rgba(0,0,0,.8); min-height: 20px; text-align: center; max-width: 640px; }
-
-    /* efeito + força (baixo direita) */
     #cueControls { position: absolute; bottom: 26px; right: 26px; display: none; align-items: flex-end; gap: 14px; pointer-events: auto; }
     #cueControls.show { display: flex; }
     #effect, #powerWrap { display: flex; flex-direction: column; align-items: center; gap: 8px;
@@ -363,8 +355,6 @@
     .forceHint .k { font-family: 'Oswald', sans-serif; font-weight: 700; font-size: 10px; color: #1a1208;
       background: var(--cream); padding: 1px 6px; border-radius: 5px; box-shadow: 0 1px 0 rgba(0,0,0,.35); }
     .forceHint span:last-child { font-size: 12px; color: var(--creamtxt); }
-
-    /* ponto de contato (Shift) — bola grande central */
     #contact { position: fixed; left: 50%; top: 50%; transform: translate(-50%,-50%); width: 210px; height: 210px;
       border-radius: 50%; display: none; z-index: 15;
       background: radial-gradient(circle at 36% 30%, #ffffff, #e6e0d2 70%, #cbc3b0);
@@ -380,11 +370,167 @@
     #contactLbl { position: absolute; left: 50%; bottom: -38px; transform: translateX(-50%); white-space: nowrap;
       font-family: 'Permanent Marker', cursive; font-size: 14px; color: var(--accent); text-shadow: 0 2px 8px rgba(0,0,0,.9); }
 
+    /* ===================== CONTROLES TOUCH (mobile) ===================== */
+    #mobileCtrls { display: none; }
+    body.mobile.ingame #mobileCtrls { display: flex; flex-direction: row; gap: 8px;
+      position: absolute; left: 50%; transform: translateX(-50%);
+      top: calc(64px + env(safe-area-inset-top)); pointer-events: auto; }
+    .mbBtn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+      width: 47px; height: 47px; border-radius: 13px; border: 2px solid var(--wood2);
+      background: radial-gradient(120% 90% at 30% 10%, var(--chalk1), var(--chalk2) 85%);
+      box-shadow: 0 5px 14px rgba(0,0,0,.45); color: var(--cream); }
+    .mbBtn span { font-size: 17px; line-height: 1; }
+    .mbBtn i { font-style: normal; font-family: 'Permanent Marker', cursive; font-size: 7.5px; color: var(--creamdim); }
+    .mbBtn.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,210,74,.35), 0 5px 14px rgba(0,0,0,.45); }
+    .mbBtn:active { transform: scale(.94); }
+    body.mobile #cueControls.show { display: none; }
+    body.mobile #ctrlWrap { display: none; }
+    body.mobile #contact { pointer-events: auto; touch-action: none; }
+    /* SLIDER DE FORÇA (estilo jogo nativo): pressiona, puxa p/ baixo, solta */
+    #powerSlider { display: none; }
+    body.mobile #powerSlider.show { display: flex; flex-direction: column; align-items: center; gap: 6px;
+      position: absolute; right: calc(10px + env(safe-area-inset-right)); top: 58%; transform: translateY(-45%);
+      pointer-events: auto; touch-action: none; }
+    #psTrack { position: relative; width: 46px; height: min(46vh, 320px); border-radius: 23px;
+      background: radial-gradient(120% 90% at 30% 10%, var(--chalk1), var(--chalk2) 85%);
+      border: 2px solid var(--wood2); box-shadow: 0 10px 26px rgba(0,0,0,.5), inset 0 0 18px rgba(0,0,0,.5); }
+    #psFill { position: absolute; top: 0; left: 4px; right: 4px; height: 0%; border-radius: 19px;
+      background: linear-gradient(to bottom, #4caf50, #ffd24a 55%, #e0491f); opacity: .85; }
+    #psHandle { position: absolute; top: 0%; left: 50%; transform: translate(-50%,-50%);
+      width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 26px; background: radial-gradient(circle at 34% 28%, #ffe9a8, var(--accent) 55%, #e6851a);
+      box-shadow: 0 4px 0 #a86a10, 0 8px 18px rgba(0,0,0,.5); pointer-events: none; }
+    #psPct { position: absolute; top: 0%; right: 56px; transform: translateY(-50%); padding: 2px 8px;
+      border-radius: 7px; background: rgba(0,0,0,.55); font-family: 'Oswald', sans-serif; font-weight: 700;
+      font-size: 14px; color: var(--accent); pointer-events: none; opacity: 0; transition: opacity .12s; }
+    #powerSlider.on #psPct { opacity: 1; }
+    #powerSlider.on #psHandle { box-shadow: 0 4px 0 #a86a10, 0 8px 18px rgba(0,0,0,.5), 0 0 0 4px rgba(255,210,74,.4); }
+    #powerSlider > i { font-style: normal; font-family: 'Permanent Marker', cursive; font-size: 10px; color: var(--creamdim); }
+
+    /* ===================== RESPONSIVO ===================== */
     @media (max-width: 1100px) {
       .lobbyGrid { flex-direction: column; overflow-y: auto; align-items: center; }
-      .lbLeft { padding: 90px 24px 0; gap: 20px; }
-      .lbRight { padding: 24px; }
+      .lbLeft { padding: 84px 24px 0; gap: 18px; flex: none; align-items: center; text-align: center; }
+      .badge { align-self: center; }
+      .lbSub { font-size: 16px; }
+      .lbRight { padding: 18px 14px 30px; flex: none; width: 100%; }
+      .lbCard { width: 480px; }
       .lbBottom { display: none; }
+    }
+
+    /* seletor de idioma do lobby */
+    #langSel { position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); right: calc(22px + env(safe-area-inset-right));
+      z-index: 5; display: flex; align-items: center; gap: 8px;
+      padding: 7px 12px; border-radius: 999px; background: rgba(0,0,0,.35); border: 1.5px dashed rgba(255,210,74,.5); }
+    @media (max-width: 560px) {
+      .lbLeft { padding: 72px 16px 0; gap: 12px; }
+      .lbTitle { font-size: 44px; }
+      .lbTitle2 { font-size: 19px; }
+      .lbSub { font-size: 14.5px; max-width: 340px; }
+      .lbCard { width: 100%; padding: 20px 16px 16px; border-width: 8px; }
+      .lbCard h2 { font-size: 24px; }
+      .botRow { grid-template-columns: 1fr 1fr; }
+      .botRow .botLvl:nth-child(3) { grid-column: 1 / -1; }
+      /* ===== HUD compacto: placar limpo, sem cortes ===== */
+      #brand { display: none; } /* no celular o placar é o protagonista */
+      #scoreboard { top: calc(6px + env(safe-area-inset-top)); padding: 4px; border-radius: 14px;
+        width: max-content; max-width: 97vw; overflow: hidden; }
+      #scoreboard::before { inset: 4px; border-radius: 11px; }
+      .pl { padding: 7px 9px; border-left-width: 3px; border-right-width: 3px; min-width: 0; }
+      .pl .row { gap: 7px; }
+      .av { width: 27px; height: 27px; font-size: 12px; }
+      .sdot { width: 9px; height: 9px; border-width: 2px; right: -1px; bottom: -1px; }
+      .pname { font-size: 12px; max-width: 76px; }
+      .tag { font-size: 7.5px; padding: 1px 4px; letter-spacing: .04em; }
+      .tag.you { display: none; } /* redundante: seu lado é sempre o direito */
+      .chips { display: none; }   /* no celular o texto "lisas · N" informa */
+      .grpline { margin-top: 2px; }
+      .pgrp { font-size: 10px; }
+      #center { padding: 5px 9px; }
+      #center .lbl { font-size: 8px; }
+      .scoreRow { gap: 5px; margin-top: 1px; }
+      .scoreRow .s { font-size: 19px; }
+      .scoreRow .dash { font-size: 12px; }
+      #dashes { gap: 3px; margin-top: 4px; }
+      #dashes i { width: 9px; height: 3px; }
+      /* banner e widgets */
+      #turnWrap { bottom: calc(10px + env(safe-area-inset-bottom)); width: 96vw; }
+      #turnPill { padding: 8px 14px; gap: 8px; }
+      #statusText { font-size: 14px; }
+      #turnPill .tdot::before { font-size: 14px; }
+      #turnHint { font-size: 12.5px; max-width: 92vw; }
+      #contact { width: 168px; height: 168px; }
+      #contactDot { width: 22px; height: 22px; }
+      .panel { padding: 22px 18px 18px; border-width: 8px; }
+      .panel h1 { font-size: 22px; }
+      #gpuModal .panel .sub { font-size: 13.5px; }
+    }
+    /* paisagem baixa (celular deitado): lobby em 2 colunas apertadas */
+    @media (max-height: 480px) and (min-width: 640px) {
+      .lbLeft { padding: 56px 10px 0 24px; gap: 8px; }
+      .lbTitle { font-size: 34px; } .lbTitle2 { font-size: 15px; }
+      .lbSub { display: none; }
+      .lbBottom { display: none; }
+      .lbCard { max-height: 88vh; padding: 14px 16px 12px; border-width: 7px; }
+      .lbCard h2 { font-size: 20px; }
+      .fieldLbl { margin: 10px 0 5px; }
+      .lbCard input { padding: 9px 12px; font-size: 15px; }
+      .btnMode { padding: 8px 6px; } .bmTitle { font-size: 16px; }
+      .orSep { margin: 10px 0 2px; }
+      .botRow { margin-top: 8px; } .botLvl { padding: 7px 4px; font-size: 11.5px; }
+      .cardHint { display: none; }
+      #scoreboard { transform: translateX(-50%) scale(.82); transform-origin: top center; }
+      #turnWrap { bottom: calc(6px + env(safe-area-inset-bottom)); }
+    }
+
+    /* ============ MOBILE + LANDSCAPE (celular deitado, em jogo) ============
+       placar VERTICAL à esquerda · botões no topo centralizados ·
+       força na direita em altura total · banner pequeno e translúcido */
+    @media (orientation: landscape) and (max-height: 560px) {
+      /* placar vertical encostado à esquerda */
+      body.mobile #scoreboard { left: calc(8px + env(safe-area-inset-left)); right: auto; top: 50%;
+        transform: translateY(-50%); flex-direction: column; align-items: stretch;
+        padding: 4px; border-radius: 14px; width: auto; max-width: 40vw; overflow: hidden; }
+      body.mobile #scoreboard::before { inset: 4px; border-radius: 11px; }
+      body.mobile .pl { padding: 6px 10px; border-radius: 0; border-right: 0 !important; border-left: 3px solid transparent; }
+      body.mobile .pl.left.turn, body.mobile .pl.right.turn { border-left-color: var(--accent);
+        background: linear-gradient(to right, rgba(255,210,74,.16), transparent); }
+      /* painel de baixo (você) volta a ler da esquerda p/ direita */
+      body.mobile .pl.right .row, body.mobile .pl.right .nameline, body.mobile .pl.right .grpline,
+      body.mobile .pl.right .chips { flex-direction: row; }
+      body.mobile .pl.right .pinfo { text-align: left; }
+      body.mobile .av { width: 30px; height: 30px; font-size: 13px; }
+      body.mobile .sdot { width: 9px; height: 9px; border-width: 2px; }
+      body.mobile .pname { font-size: 12.5px; max-width: 96px; }
+      body.mobile .tag { font-size: 8px; padding: 1px 5px; }
+      body.mobile .chip { width: 13px; height: 13px; }
+      body.mobile .pgrp { font-size: 10.5px; }
+      body.mobile .grpline { margin-top: 3px; }
+      /* centro do placar vira uma linha fininha entre os dois painéis */
+      body.mobile #center { flex-direction: row; gap: 10px; padding: 4px 10px;
+        border-left: 0; border-right: 0; border-top: 2px dashed rgba(255,255,255,.14);
+        border-bottom: 2px dashed rgba(255,255,255,.14); }
+      body.mobile #center .lbl { display: none; }
+      body.mobile .scoreRow { margin-top: 0; gap: 6px; }
+      body.mobile .scoreRow .s { font-size: 17px; }
+      body.mobile .scoreRow .dash { font-size: 11px; }
+      body.mobile #dashes { margin-top: 0; gap: 3px; }
+      body.mobile #dashes i { width: 9px; height: 3px; }
+      /* botões de ação no TOPO, centralizados */
+      body.mobile.ingame #mobileCtrls { top: calc(8px + env(safe-area-inset-top)); }
+      /* barra de força: altura total à direita, com respiro */
+      body.mobile #powerSlider.show { top: 50%; transform: translateY(-50%);
+        right: calc(8px + env(safe-area-inset-right)); }
+      body.mobile #psTrack { height: calc(100vh - 28px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
+      body.mobile #powerSlider > i { display: none; }
+      /* banner: beeem menor, mais baixo e translúcido (atrapalha o mínimo) */
+      body.mobile #turnWrap { bottom: calc(3px + env(safe-area-inset-bottom)); gap: 1px;
+        opacity: .62; pointer-events: none; }
+      body.mobile #turnPill { padding: 2px 10px; gap: 6px; border-width: 1px;
+        animation: none; background: rgba(12,20,16,.45); backdrop-filter: none; -webkit-backdrop-filter: none; }
+      body.mobile #turnPill .tdot::before { font-size: 10px; }
+      body.mobile #statusText { font-size: 10px; }
+      body.mobile #turnHint { font-size: 9px; opacity: .8; min-height: 0; text-shadow: none; }
     }
   </style>
 </head>
@@ -402,8 +548,8 @@
         <div class="row">
           <div class="avwrap"><div class="av blue" id="avL">A</div><div class="sdot" id="dotL"></div></div>
           <div class="pinfo">
-            <div class="nameline"><span class="pname" id="nmL">Jogador</span><span class="tag na">NA VEZ</span></div>
-            <div class="grpline"><div class="chips" id="chipsL"></div><span class="pgrp" id="grpL">mesa aberta</span></div>
+            <div class="nameline"><span class="pname" id="nmL" data-i18n="hud.player">Jogador</span><span class="tag na" data-i18n="tag.turn">NA VEZ</span></div>
+            <div class="grpline"><div class="chips" id="chipsL"></div><span class="pgrp" id="grpL" data-i18n="grp.open">mesa aberta</span></div>
           </div>
         </div>
       </div>
@@ -416,47 +562,60 @@
         <div class="row">
           <div class="avwrap"><div class="av green" id="avR">V</div><div class="sdot" id="dotR"></div></div>
           <div class="pinfo">
-            <div class="nameline"><span class="pname" id="nmR">Você</span><span class="tag you">VOCÊ</span><span class="tag na">NA VEZ</span></div>
-            <div class="grpline"><div class="chips" id="chipsR"></div><span class="pgrp" id="grpR">mesa aberta</span></div>
+            <div class="nameline"><span class="pname" id="nmR" data-i18n="default.you">Você</span><span class="tag you" data-i18n="tag.you">VOCÊ</span><span class="tag na" data-i18n="tag.turn">NA VEZ</span></div>
+            <div class="grpline"><div class="chips" id="chipsR"></div><span class="pgrp" id="grpR" data-i18n="grp.open">mesa aberta</span></div>
           </div>
         </div>
       </div>
     </div>
 
     <div id="ctrlWrap">
-      <button id="ctrlBtn"><span>📋</span><span class="lbl">CONTROLES</span><span class="hk">H</span></button>
+      <button id="ctrlBtn"><span>📋</span><span class="lbl" data-i18n="hud.controls">CONTROLES</span><span class="hk">H</span></button>
       <div id="keys" class="glass hidden">
-        <div class="krow"><span class="k">Clique</span><span class="d">travar cursor</span></div>
-        <div class="krow"><span class="k">Mouse</span><span class="d">girar o taco · ↑↓ altura da câmera</span></div>
-        <div class="krow"><span class="k">Ctrl</span><span class="d">segurar + puxar = força · soltar = tacar</span></div>
-        <div class="krow"><span class="k">Shift</span><span class="d">ajustar efeito</span></div>
-        <div class="krow"><span class="k">Tab</span><span class="d">ver de cima</span></div>
-        <div class="krow"><span class="k">Scroll</span><span class="d">zoom</span></div>
-        <div class="krow"><span class="k">N · B · M</span><span class="d">música: próxima · anterior · pausar</span></div>
-        <div class="krow"><span class="k">Esc</span><span class="d">menu (pausa / config / sair)</span></div>
+        <div class="krow"><span class="k" data-i18n="k.click">Clique</span><span class="d" data-i18n="d.click">travar cursor</span></div>
+        <div class="krow"><span class="k">Mouse</span><span class="d" data-i18n="d.mouse">girar o taco · ↑↓ altura da câmera</span></div>
+        <div class="krow"><span class="k">Ctrl</span><span class="d" data-i18n="d.ctrl">segurar + puxar = força · soltar = tacar</span></div>
+        <div class="krow"><span class="k">Shift</span><span class="d" data-i18n="d.shift">ajustar efeito</span></div>
+        <div class="krow"><span class="k">Tab</span><span class="d" data-i18n="d.tab">ver de cima</span></div>
+        <div class="krow"><span class="k">Scroll</span><span class="d" data-i18n="d.scroll">zoom</span></div>
+        <div class="krow"><span class="k">N · B · M</span><span class="d" data-i18n="d.music">música: próxima · anterior · pausar</span></div>
+        <div class="krow"><span class="k">Esc</span><span class="d" data-i18n="d.esc">menu (pausa / config / sair)</span></div>
       </div>
     </div>
 
     <div id="turnWrap">
-      <div id="turnPill" class="glass mine"><div class="tdot"></div><span id="statusText">Conectando...</span></div>
+      <div id="turnPill" class="glass mine"><div class="tdot"></div><span id="statusText" data-i18n="status.connecting">Conectando...</span></div>
       <div id="turnHint"></div>
     </div>
 
     <div id="cueControls">
       <div id="effect" class="glass">
         <div class="effBall"><div class="cx"></div><div class="cy"></div><div id="effectDot"></div></div>
-        <span class="lbl2">EFEITO</span>
+        <span class="lbl2" data-i18n="hud.effect">EFEITO</span>
       </div>
       <div id="powerWrap" class="glass">
         <div class="forceTop">
           <div class="forceBar"><div id="powerFill"></div><div id="powerMark"></div></div>
-          <div><div class="forceNum"><span id="powerPct">0</span><span>%</span></div><div class="lbl2" style="margin-top:3px">FORÇA</div></div>
+          <div><div class="forceNum"><span id="powerPct">0</span><span>%</span></div><div class="lbl2" style="margin-top:3px" data-i18n="hud.power">FORÇA</div></div>
         </div>
-        <div class="forceHint"><span class="k">CTRL</span><span>segurar + puxar</span></div>
+        <div class="forceHint"><span class="k">CTRL</span><span data-i18n="hud.holdpull">segurar + puxar</span></div>
       </div>
     </div>
 
-    <div id="contact"><div id="contactDot"></div><div id="contactLbl">efeito / ponto de contato</div></div>
+    <div id="contact"><div id="contactDot"></div><div id="contactLbl" data-i18n="contact.lbl">efeito / ponto de contato</div></div>
+
+    <!-- ===== controles TOUCH (só aparecem no celular) ===== -->
+    <div id="mobileCtrls">
+      <button id="mbMenu" class="mbBtn" aria-label="menu" data-i18n-aria="mb.menu"><span>☰</span><i data-i18n="mb.menu">menu</i></button>
+      <button id="mbTop" class="mbBtn" aria-label="ver de cima" data-i18n-aria="mb.ariaTop"><span>🔝</span><i data-i18n="mb.top">de cima</i></button>
+      <button id="mbCam" class="mbBtn" aria-label="altura da câmera" data-i18n-aria="mb.ariaCam"><span>📷</span><i data-i18n="mb.cam">câmera</i></button>
+      <button id="mbSpin" class="mbBtn" aria-label="efeito" data-i18n-aria="mb.ariaSpin"><span>🎯</span><i data-i18n="mb.spin">efeito</i></button>
+      <button id="mbMusic" class="mbBtn" aria-label="próxima música" data-i18n-aria="mb.ariaMusic"><span>🎵</span><i data-i18n="mb.music">música</i></button>
+    </div>
+    <div id="powerSlider" aria-label="força da tacada" data-i18n-aria="ps.aria">
+      <div id="psTrack"><div id="psFill"></div><div id="psPct">0%</div><div id="psHandle">🎱</div></div>
+      <i data-i18n="mb.power">força ↓</i>
+    </div>
   </div>
 
   <div id="lobby" class="overlay">
@@ -464,32 +623,35 @@
     <div class="vignette"></div>
     <div id="lights"><div class="wire"></div></div>
 
+    <!-- seletor de idioma (canto inferior direito do lobby) -->
+    <div id="langSel"></div>
+
     <div class="lobbyGrid">
       <!-- ===== esquerda: letreiro neon ===== -->
       <div class="lbLeft">
-        <div class="badge">🍺 bora jogar uma sinuca?</div>
+        <div class="badge" data-i18n="lobby.badge">🍺 bora jogar uma sinuca?</div>
 
         <div class="neonWrap">
           <h1 class="lbTitle">OrbitPool</h1>
-          <div class="lbTitle2">~ sinuca de boteco ~</div>
+          <div class="lbTitle2" data-i18n="lobby.tagline">~ sinuca de boteco ~</div>
         </div>
 
-        <p class="lbSub">Aquele 8-ball raiz pra jogar com a galera. Cria a mesa, manda o código no grupo do zap e bora — sem cadastro, sem frescura.</p>
+        <p class="lbSub" data-i18n="lobby.sub">Aquele 8-ball raiz pra jogar com a galera. Cria a mesa, manda o código no grupo do zap e bora — sem cadastro, sem frescura.</p>
 
         <div class="lbBottom">
           <div class="beer">
             <div class="glass2"><div class="liquid"></div><div class="foam"></div></div>
-            <div class="cap">copo sujo</div>
+            <div class="cap" data-i18n="beer.cap">copo sujo</div>
           </div>
           <div class="howto">
-            <div class="howHead">como joga:</div>
+            <div class="howHead" data-i18n="howto.head">como joga:</div>
             <div class="howGrid">
-              <div><span class="k">MOUSE</span>mira · ↑↓ câmera</div>
-              <div><span class="k">CTRL</span>segura e puxa = força</div>
-              <div><span class="k">SHIFT</span>ajusta o efeito</div>
-              <div><span class="k">TAB</span>vê de cima</div>
-              <div><span class="k">SCROLL</span>chega mais perto</div>
-              <div><span class="k">ESC</span>pausa / sai</div>
+              <div><span class="k">MOUSE</span><span data-i18n="howto.mouse">mira · ↑↓ câmera</span></div>
+              <div><span class="k">CTRL</span><span data-i18n="howto.ctrl">segura e puxa = força</span></div>
+              <div><span class="k">SHIFT</span><span data-i18n="howto.shift">ajusta o efeito</span></div>
+              <div><span class="k">TAB</span><span data-i18n="howto.tab">vê de cima</span></div>
+              <div><span class="k">SCROLL</span><span data-i18n="howto.scroll">chega mais perto</span></div>
+              <div><span class="k">ESC</span><span data-i18n="howto.esc">pausa / sai</span></div>
             </div>
           </div>
         </div>
@@ -498,47 +660,47 @@
       <!-- ===== direita: quadro-negro ===== -->
       <div class="lbRight">
         <div class="lbCard">
-          <h2>Menu do Dia</h2>
-          <p class="cardSub">— hoje tem sinuca —</p>
+          <h2 data-i18n="card.title">Menu do Dia</h2>
+          <p class="cardSub" data-i18n="card.sub">— hoje tem sinuca —</p>
           <div class="chalkline"></div>
 
-          <label class="fieldLbl" for="name">seu apelido</label>
-          <input id="name" maxlength="20" placeholder="Ex: Zé da Tacada" />
+          <label class="fieldLbl" for="name" data-i18n="field.nick">seu apelido</label>
+          <input id="name" maxlength="20" placeholder="Ex: Zé da Tacada" data-i18n-ph="nick.ph" />
 
-          <label class="fieldLbl">abrir a mesa</label>
+          <label class="fieldLbl" data-i18n="field.open">abrir a mesa</label>
           <div class="createRow">
             <button id="createBtn" class="btnMode">
               <span class="bmTitle">🎱 1v1</span>
-              <span class="bmSub">partida clássica</span>
+              <span class="bmSub" data-i18n="mode.1v1">partida clássica</span>
             </button>
             <button id="createBtn2" class="btnMode">
               <span class="bmTitle">🤝 2v2</span>
-              <span class="bmSub">duplas · 4 jogadores</span>
+              <span class="bmSub" data-i18n="mode.2v2">duplas · 4 jogadores</span>
             </button>
           </div>
 
           <div id="roomShare" class="share" hidden>
-            <p class="shareLbl">manda esse código pros amigos:</p>
-            <div class="codeRow"><span id="roomCodeVal" class="code"></span><button id="copyCodeBtn" class="copy">Copiar</button></div>
+            <p class="shareLbl" data-i18n="share.lbl">manda esse código pros amigos:</p>
+            <div class="codeRow"><span id="roomCodeVal" class="code"></span><button id="copyCodeBtn" class="copy" data-i18n="btn.copy">Copiar</button></div>
           </div>
 
-          <div class="orSep"><span>ou entra na dos amigos</span></div>
+          <div class="orSep"><span data-i18n="or.join">ou entra na dos amigos</span></div>
           <div class="joinRow">
             <input id="joinCode" maxlength="8" placeholder="K7QX" autocapitalize="characters" />
-            <button id="joinBtn" class="btnJoin">Entrar</button>
+            <button id="joinBtn" class="btnJoin" data-i18n="btn.join">Entrar</button>
           </div>
 
-          <div class="orSep"><span>ou treina com o bot</span></div>
+          <div class="orSep"><span data-i18n="or.bot">ou treina com o bot</span></div>
           <div class="botRow">
-            <button class="botLvl" data-lvl="iniciante">Iniciante</button>
-            <button class="botLvl" data-lvl="amador">Amador</button>
-            <button class="botLvl" data-lvl="pro">Pro</button>
-            <button class="botLvl mine" data-lvl="mineirinho">🐐 Mineirinho de Araxá</button>
+            <button class="botLvl" data-lvl="iniciante" data-i18n="bot.beginner">Iniciante</button>
+            <button class="botLvl" data-lvl="amador" data-i18n="bot.amateur">Amador</button>
+            <button class="botLvl" data-lvl="pro" data-i18n="bot.pro">Pro</button>
+            <button class="botLvl mine" data-lvl="mineirinho" data-i18n="bot.goat">🐐 Mineirinho de Araxá</button>
           </div>
 
           <p id="lobbyMsg" class="msg"></p>
-          <p class="cardHint"><span>Conexão direta entre vocês. Zero servidor, zero conta — é só chegar e jogar. Pra testar sozinho, abre em duas abas.</span></p>
-          <p class="cardHint"><span>Mesa 3D: “Billiard Table” de <a href="https://sketchfab.com/futurealiti" target="_blank" rel="noopener">Futurealiti</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a>).</span></p>
+          <p class="cardHint"><span data-i18n="hint.p2p">Conexão direta entre vocês. Zero servidor, zero conta — é só chegar e jogar. Pra testar sozinho, abre em duas abas.</span></p>
+          <p class="cardHint"><span data-i18n-html="hint.credit">Mesa 3D: “Billiard Table” de <a href="https://sketchfab.com/futurealiti" target="_blank" rel="noopener">Futurealiti</a> (<a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noopener">CC-BY-4.0</a>).</span></p>
         </div>
       </div>
     </div>
@@ -564,12 +726,12 @@
 
   <div id="teamLobby" class="overlay hidden">
     <div class="panel tlPanel">
-      <h1>🤝 Duplas — sala <span id="tlCode"></span></h1>
-      <p class="sub">O criador da sala monta os times. Rotação: A1 → B1 → A2 → B2.</p>
+      <h1><span data-i18n="tl.title">🤝 Duplas — sala</span> <span id="tlCode"></span></h1>
+      <p class="sub" data-i18n="tl.sub">O criador da sala monta os times. Rotação: A1 → B1 → A2 → B2.</p>
       <div id="tlList"></div>
       <div class="tlBtns">
-        <button id="tlRandom" class="tlGhost">🎲 Times aleatórios</button>
-        <button id="tlStart">Começar partida</button>
+        <button id="tlRandom" class="tlGhost" data-i18n="tl.random">🎲 Times aleatórios</button>
+        <button id="tlStart" data-i18n="tl.start">Começar partida</button>
       </div>
       <p id="tlMsg" class="msg"></p>
     </div>
@@ -578,24 +740,34 @@
   <!-- aviso de aceleração gráfica desativada (WebGL por software) -->
   <div id="gpuModal" class="overlay hidden" style="z-index:40">
     <div class="panel">
-      <h1>🐢 Tá rodando no modo lento…</h1>
-      <p class="sub">A <b>aceleração gráfica</b> do seu navegador está desativada — o jogo funciona,
+      <h1 data-i18n="gpu.slow.title">🐢 Tá rodando no modo lento…</h1>
+      <p class="sub" data-i18n-html="gpu.slow.body">A <b>aceleração gráfica</b> do seu navegador está desativada — o jogo funciona,
         mas sem usar a placa de vídeo ele trava e engasga. Ativando, a experiência melhora <b>muito</b>.</p>
       <div id="gpuSteps" class="gpuSteps"></div>
-      <button id="gpuOpenBtn">🔧 Abrir configurações do navegador</button>
-      <button id="gpuDismissBtn" class="tlGhost">Jogar assim mesmo</button>
-      <p class="hint">Ative “Usar aceleração de hardware quando disponível”, reinicie o navegador e volte aqui.</p>
+      <button id="gpuOpenBtn" data-i18n="gpu.open">🔧 Abrir configurações do navegador</button>
+      <button id="gpuDismissBtn" class="tlGhost" data-i18n="gpu.playAnyway">Jogar assim mesmo</button>
+      <p class="hint" data-i18n="gpu.hint">Ative “Usar aceleração de hardware quando disponível”, reinicie o navegador e volte aqui.</p>
     </div>
   </div>
 
   <div id="endOverlay" class="overlay hidden">
     <div class="panel">
-      <h1 id="endTitle">Fim de jogo</h1>
+      <h1 id="endTitle" data-i18n="end.title">Fim de jogo</h1>
       <p id="endMsg" class="sub"></p>
-      <button id="rematchBtn">Jogar de novo</button>
+      <button id="rematchBtn" data-i18n="btn.rematch">Jogar de novo</button>
       <p id="rematchMsg" class="msg"></p>
     </div>
   </div>
+
+  <!-- i18n primeiro: traduz o DOM estático e fornece OrbitI18N.t aos scripts -->
+  <script src="i18n.js"></script>
+  <script>
+    // Seletor de idioma do lobby — dropdown personalizado (tema do jogo).
+    (function () {
+      var mount = document.getElementById('langSel');
+      if (mount && window.OrbitI18N) OrbitI18N.customSelect(mount);
+    })();
+  </script>
 
   <script>
     // Carregamento resiliente do Three.js: tenta um arquivo LOCAL (se você
@@ -618,8 +790,9 @@
         s.src = src; s.onload = ok; s.onerror = err;
         document.head.appendChild(s);
       }
+      var T = function (k, p) { return window.OrbitI18N ? OrbitI18N.t(k, p) : k; };
       function tryThree(i) {
-        if (i >= SRCS.length) { fail('Não consegui carregar a engine 3D (Three.js). Desative bloqueadores/extensões para localhost, ou baixe o three.min.js para a pasta do jogo.'); return; }
+        if (i >= SRCS.length) { fail(T('err.engine')); return; }
         loadScript(SRCS[i], function () {
           if (window.THREE) startApp(); else tryThree(i + 1);
         }, function () { tryThree(i + 1); });
@@ -657,6 +830,12 @@
           loadScript(PEER_SRCS[i], function () { if (window.Peer) done(); else tryP(i + 1); }, function () { tryP(i + 1); });
         })(0);
       }
+      // PWA: registra o service worker (cache offline + instalável)
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('sw.js').catch(function () { /* http simples: sem PWA */ });
+        });
+      }
       function startApp() {
         loadObjLoader(function () {
           loadPeer(function () {
@@ -665,13 +844,13 @@
                 loadScript('menu.js', function () {
                   loadScript('net.js', function () {
                     loadScript('bot.js', function () {
-                      var g = function () { loadScript('game3d.js', function () {}, function () { fail('Falha ao carregar game3d.js'); }); };
+                      var g = function () { loadScript('game3d.js', function () {}, function () { fail(T('err.file', { file: 'game3d.js' })); }); };
                       loadScript('table3d_collider.js', g, g); // colisor do modelo (opcional)
-                    }, function () { fail('Falha ao carregar bot.js'); });
-                  }, function () { fail('Falha ao carregar net.js'); });
-                }, function () { fail('Falha ao carregar menu.js'); });
-              }, function () { fail('Falha ao carregar audio.js'); });
-            }, function () { fail('Falha ao carregar physics.js'); });
+                    }, function () { fail(T('err.file', { file: 'bot.js' })); });
+                  }, function () { fail(T('err.file', { file: 'net.js' })); });
+                }, function () { fail(T('err.file', { file: 'menu.js' })); });
+              }, function () { fail(T('err.file', { file: 'audio.js' })); });
+            }, function () { fail(T('err.file', { file: 'physics.js' })); });
           });
         });
       }
