@@ -442,8 +442,11 @@ function updateCamera(dt) {
   let desired, look;
   if (cueView() && cue() && !cue().potted) {
     const c = cue(), d = aimDir;
-    // Órbita vertical: distância constante, elevação controlada por camPitch.
-    const dist = (470 + chargePower * 155) * zoom;
+    // Órbita vertical: elevação controlada por camPitch. Abaixar a câmera
+    // APROXIMA da branca (ler o caminho de perto); levantar AFASTA (visão
+    // geral). Na altura padrão (0.48) fica na distância de sempre.
+    const near = 0.32 + 1.4167 * camPitch; // 0→0.32x · 0.48→1x · 1→1.75x
+    const dist = (470 + chargePower * 155) * zoom * near;
     const elev = ELEV_MIN + camPitch * (ELEV_MAX - ELEV_MIN);
     const back = Math.cos(elev) * dist;
     const height = Math.max(Math.sin(elev) * dist, 3 * R); // nunca abaixo do rail
