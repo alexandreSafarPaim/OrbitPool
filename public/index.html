@@ -148,8 +148,8 @@
     #lights { position:absolute; top:0; left:0; right:0; height:70px; pointer-events:none; }
     #lights .wire { position:absolute; top:14px; left:0; right:0; height:40px; border-bottom:2px solid rgba(0,0,0,.4);
       border-radius:0 0 50% 50%/0 0 100% 100%; }
-    .lobbyGrid { position: relative; height: 100%; display: flex; align-items: stretch; }
-    .lbLeft { flex: 1.05; display: flex; flex-direction: column; justify-content: center; padding: 0 60px 0 90px; gap: 30px; min-width: 0; }
+    .lobbyGrid { position: relative; height: 100%; display: flex; align-items: stretch; justify-content: center; gap: 0.5rem; }
+    .lbLeft { display: flex; flex-direction: column; justify-content: center; padding: 0 60px 0 90px; gap: 30px; min-width: 0; }
     .badge { display: inline-flex; align-self: flex-start; align-items: center; gap: 9px; padding: 7px 15px;
       background: rgba(0,0,0,.35); border: 1.5px dashed rgba(255,210,74,.5); border-radius: 999px;
       font-family: 'Permanent Marker', cursive; font-size: 13px; letter-spacing: .04em; color: var(--accent); }
@@ -176,7 +176,7 @@
       font-size: 12px; color: #1a1208; background: var(--cream); padding: 4px 8px; border-radius: 6px; box-shadow: 0 2px 0 rgba(0,0,0,.35); }
 
     /* quadro-negro (card direito) */
-    .lbRight { flex: .95; display: flex; align-items: center; justify-content: center; padding: 0 90px 0 40px; min-width: 0; }
+    .lbRight { display: flex; align-items: center; justify-content: center; padding: 0 90px 0 40px; min-width: 0; }
     .lbCard { position: relative; width: 442px; max-width: 96%; padding: 28px 28px 22px; border-radius: 14px; border: 11px solid transparent;
       background:
         radial-gradient(120% 90% at 30% 10%, var(--chalk1), var(--chalk2) 80%) padding-box,
