@@ -126,6 +126,11 @@ window.OrbitI18N = (function () {
     'tl.balance': { en: 'Each team needs 2 players.', pt: 'Os times precisam ter 2 jogadores cada.', es: 'Cada equipo necesita 2 jugadores.', fr: 'Chaque équipe doit avoir 2 joueurs.' },
     'tl.ready': { en: 'All set! You can start.', pt: 'Tudo pronto! Pode começar.', es: '¡Todo listo! Puedes empezar.', fr: 'Tout est prêt ! Tu peux lancer.' },
     'tl.waitHost': { en: 'Waiting for the host to start the match…', pt: 'Aguardando o host começar a partida…', es: 'Esperando a que el anfitrión empiece…', fr: 'En attente du lancement par l\'hôte…' },
+    'tl.close': { en: '✖ Close room', pt: '✖ Fechar sala', es: '✖ Cerrar sala', fr: '✖ Fermer la salle' },
+    'tl.leave': { en: '✖ Leave room', pt: '✖ Sair da sala', es: '✖ Salir de la sala', fr: '✖ Quitter la salle' },
+    'tl.closed': { en: 'The host closed the room.', pt: 'O criador fechou a sala.', es: 'El anfitrión cerró la sala.', fr: 'L\'hôte a fermé la salle.' },
+    'tl.closedByYou': { en: 'Room closed.', pt: 'Sala fechada.', es: 'Sala cerrada.', fr: 'Salle fermée.' },
+    'tl.leftByYou': { en: 'You left the room.', pt: 'Você saiu da sala.', es: 'Saliste de la sala.', fr: 'Tu as quitté la salle.' },
 
     // ===== Modal de GPU / WebGL =====
     'gpu.slow.title': { en: '🐢 Running in slow mode…', pt: '🐢 Tá rodando no modo lento…', es: '🐢 Va en modo lento…', fr: '🐢 Ça tourne au ralenti…' },
@@ -241,7 +246,7 @@ window.OrbitI18N = (function () {
     'net.codeTaken': { en: 'That room code is already in use. Create another room.', pt: 'Esse código de sala já está em uso. Crie outra sala.', es: 'Ese código de sala ya está en uso. Crea otra sala.', fr: 'Ce code de salle est déjà utilisé. Crée une autre salle.' },
     'net.error': { en: 'Network error: {err}', pt: 'Erro de rede: {err}', es: 'Error de red: {err}', fr: 'Erreur réseau : {err}' },
     'net.timeout': { en: 'Couldn\'t find the room. Check the code (the host must have created the room and be online).', pt: 'Não encontrei a sala. Confira o código (o host precisa ter criado a sala e estar online).', es: 'No encontré la sala. Revisa el código (el anfitrión debe haber creado la sala y estar en línea).', fr: 'Salle introuvable. Vérifie le code (l\'hôte doit avoir créé la salle et être en ligne).' },
-    'net.notFound': { en: 'Room not found. Check the code with the host.', pt: 'Sala não encontrada. Confira o código com o host.', es: 'Sala no encontrada. Confirma el código con el anfitrión.', fr: 'Salle introuvable. Vérifie le code avec l\'hôte.' },
+    'net.notFound': { en: 'Room not found. Check the code and try again.', pt: 'Sala não encontrada. Confira o código e tente de novo.', es: 'Sala no encontrada. Revisa el código e inténtalo de nuevo.', fr: 'Salle introuvable. Vérifie le code et réessaie.' },
 
     // ===== Menu de pausa / configurações (menu.js) =====
     'menu.pause': { en: '⏸ Paused', pt: '⏸ Pausa', es: '⏸ Pausa', fr: '⏸ Pause' },

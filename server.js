@@ -133,6 +133,10 @@ server.on('upgrade', (req, socket) => {
     conn.buffer = Buffer.concat([conn.buffer, chunk]);
     parseFrames(conn);
   });
+  // 'end' (FIN) É o evento que chega quando o outro lado fecha de forma
+  // limpa — em sockets de upgrade o 'close' pode nunca disparar sozinho,
+  // porque o Node não fecha o nosso lado automaticamente aqui.
+  socket.on('end', () => conn.close());
   socket.on('close', () => conn.close());
   socket.on('error', () => conn.close());
 });
@@ -201,7 +205,7 @@ function leaveRoom(conn) {
   if (!room) return;
   room.clients.delete(conn);
   conn.room = null;
-  if (!room.started && room.slots === 4) broadcastLobby(room); // ainda no lobby de times
+  if (!room.started) broadcastLobby(room); // ainda no lobby da sala
   else broadcastRoom(room, { t: 'peer_left', no: conn.playerNo });
   if (room.clients.size === 0) rooms.delete(room.id);
 }
@@ -227,8 +231,11 @@ function handleMessage(conn, raw) {
       if (!room) room = makeRoom(roomId, msg.slots | 0); // 1º a entrar (host) define 2 ou 4 vagas
 
       if (room.clients.size >= room.slots) {
-        conn.send({ t: 'full' }); // sem vaga (reconexão usa a vaga de quem caiu)
-        return;
+        // Sala "cheia" mas com partida rolando: pode ser reconexão de quem
+        // caiu sem fechar o socket (celular). Derruba o zumbi de mesmo nome.
+        const zombie = room.started ? [...room.clients].find((c) => c.name === conn.name) : null;
+        if (!zombie) { conn.send({ t: 'full' }); return; }
+        zombie.close(); // leaveRoom remove e libera o playerNo dele
       }
 
       room.clients.add(conn);
@@ -243,16 +250,8 @@ function handleMessage(conn, raw) {
         // RECONEXÃO em partida andando: avisa os demais — o menor nº presente
         // responde com o snapshot ('resync') para quem voltou.
         broadcastRoom(room, { t: 'rejoined', no: conn.playerNo, name: conn.name }, conn);
-      } else if (room.slots === 2 && room.clients.size === 2) {
-        // 1v1: começa direto (comportamento original).
-        room.started = true;
-        const [a, b] = [...room.clients];
-        a.send({ t: 'start', you: a.playerNo, opponent: b.name, startTurn: 1 });
-        b.send({ t: 'start', you: b.playerNo, opponent: a.name, startTurn: 1 });
-      } else if (room.slots === 4) {
-        broadcastLobby(room); // 2v2: lobby de times (o host organiza e envia 'start')
       } else {
-        conn.send({ t: 'waiting' });
+        broadcastLobby(room); // 1v1 e 2v2: lobby da sala (o host envia 'start')
       }
       break;
     }
