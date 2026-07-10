@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 
   <!-- ============ SEO ============ -->
   <title>OrbitPool — Sinuca 8-Ball 3D Multiplayer Online Grátis</title>
@@ -380,11 +380,118 @@
     #contactLbl { position: absolute; left: 50%; bottom: -38px; transform: translateX(-50%); white-space: nowrap;
       font-family: 'Permanent Marker', cursive; font-size: 14px; color: var(--accent); text-shadow: 0 2px 8px rgba(0,0,0,.9); }
 
+    /* ===================== CONTROLES TOUCH (mobile) ===================== */
+    #mobileCtrls, #mbAimBtns { display: none; }
+    body.mobile.ingame #mobileCtrls { display: flex; flex-direction: column; gap: 10px;
+      position: absolute; left: calc(12px + env(safe-area-inset-left)); top: 50%; transform: translateY(-50%);
+      pointer-events: auto; }
+    .mbBtn { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
+      width: 52px; height: 52px; border-radius: 14px; border: 2px solid var(--wood2);
+      background: radial-gradient(120% 90% at 30% 10%, var(--chalk1), var(--chalk2) 85%);
+      box-shadow: 0 6px 16px rgba(0,0,0,.45); color: var(--cream); }
+    .mbBtn span { font-size: 19px; line-height: 1; }
+    .mbBtn i { font-style: normal; font-family: 'Permanent Marker', cursive; font-size: 8.5px; color: var(--creamdim); }
+    .mbBtn.on { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(255,210,74,.35), 0 6px 16px rgba(0,0,0,.45); }
+    .mbBtn:active { transform: scale(.94); }
+    body.mobile #mbAimBtns.show { display: block; }
+    .mbAim { position: absolute; bottom: calc(96px + env(safe-area-inset-bottom)); width: 56px; height: 72px;
+      border-radius: 16px; border: 2px solid var(--wood2); font-size: 22px; color: var(--accent);
+      background: radial-gradient(120% 90% at 30% 10%, var(--chalk1), var(--chalk2) 85%);
+      box-shadow: 0 6px 16px rgba(0,0,0,.45); pointer-events: auto; touch-action: none; }
+    #mbLeft { left: calc(14px + env(safe-area-inset-left)); }
+    #mbRight { right: calc(14px + env(safe-area-inset-right)); }
+    .mbAim:active { transform: scale(.94); }
+    body.mobile #ctrlWrap { display: none; }
+    body.mobile #contact { pointer-events: auto; touch-action: none; }
+    /* SLIDER DE FORÇA (estilo jogo nativo): pressiona, puxa p/ baixo, solta */
+    #powerSlider { display: none; }
+    body.mobile #powerSlider.show { display: flex; flex-direction: column; align-items: center; gap: 6px;
+      position: absolute; right: calc(10px + env(safe-area-inset-right)); top: 50%; transform: translateY(-50%);
+      pointer-events: auto; touch-action: none; }
+    #psTrack { position: relative; width: 46px; height: min(46vh, 320px); border-radius: 23px;
+      background: radial-gradient(120% 90% at 30% 10%, var(--chalk1), var(--chalk2) 85%);
+      border: 2px solid var(--wood2); box-shadow: 0 10px 26px rgba(0,0,0,.5), inset 0 0 18px rgba(0,0,0,.5); }
+    #psFill { position: absolute; top: 0; left: 4px; right: 4px; height: 0%; border-radius: 19px;
+      background: linear-gradient(to bottom, #4caf50, #ffd24a 55%, #e0491f); opacity: .85; }
+    #psHandle { position: absolute; top: 0%; left: 50%; transform: translate(-50%,-50%);
+      width: 54px; height: 54px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+      font-size: 26px; background: radial-gradient(circle at 34% 28%, #ffe9a8, var(--accent) 55%, #e6851a);
+      box-shadow: 0 4px 0 #a86a10, 0 8px 18px rgba(0,0,0,.5); pointer-events: none; }
+    #psPct { position: absolute; top: 0%; right: 56px; transform: translateY(-50%); padding: 2px 8px;
+      border-radius: 7px; background: rgba(0,0,0,.55); font-family: 'Oswald', sans-serif; font-weight: 700;
+      font-size: 14px; color: var(--accent); pointer-events: none; opacity: 0; transition: opacity .12s; }
+    #powerSlider.on #psPct { opacity: 1; }
+    #powerSlider.on #psHandle { box-shadow: 0 4px 0 #a86a10, 0 8px 18px rgba(0,0,0,.5), 0 0 0 4px rgba(255,210,74,.4); }
+    #powerSlider > i { font-style: normal; font-family: 'Permanent Marker', cursive; font-size: 10px; color: var(--creamdim); }
+    /* barra de força desktop sai no mobile (o slider é o feedback) */
+    body.mobile #cueControls.show { display: none; }
+    /* mira fina: cantos inferiores, longe do slider */
+    body.mobile #mbRight { right: calc(76px + env(safe-area-inset-right)); bottom: calc(18px + env(safe-area-inset-bottom)); }
+    body.mobile #mbLeft { bottom: calc(18px + env(safe-area-inset-bottom)); }
+
+    /* ===================== RESPONSIVO ===================== */
     @media (max-width: 1100px) {
       .lobbyGrid { flex-direction: column; overflow-y: auto; align-items: center; }
-      .lbLeft { padding: 90px 24px 0; gap: 20px; }
-      .lbRight { padding: 24px; }
+      .lbLeft { padding: 84px 24px 0; gap: 18px; flex: none; align-items: center; text-align: center; }
+      .badge { align-self: center; }
+      .lbSub { font-size: 16px; }
+      .lbRight { padding: 18px 14px 30px; flex: none; width: 100%; }
+      .lbCard { width: 480px; }
       .lbBottom { display: none; }
+    }
+    @media (max-width: 560px) {
+      .lbLeft { padding: 72px 16px 0; gap: 12px; }
+      .lbTitle { font-size: 44px; }
+      .lbTitle2 { font-size: 19px; }
+      .lbSub { font-size: 14.5px; max-width: 340px; }
+      .lbCard { width: 100%; padding: 20px 16px 16px; border-width: 8px; }
+      .lbCard h2 { font-size: 24px; }
+      .botRow { grid-template-columns: 1fr 1fr; }
+      .botRow .botLvl:nth-child(3) { grid-column: 1 / -1; }
+      /* HUD compacto */
+      #brand { top: calc(8px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left)); padding: 5px 12px 7px; }
+      #brand .name { font-size: 16px; }
+      #scoreboard { top: calc(6px + env(safe-area-inset-top)); padding: 5px; border-radius: 14px; max-width: 96vw; }
+      #scoreboard::before { inset: 5px; border-radius: 10px; }
+      .pl { padding: 7px 10px; }
+      .av { width: 30px; height: 30px; font-size: 13px; }
+      .pname { font-size: 12.5px; max-width: 74px; }
+      .tag { font-size: 8px; padding: 1px 5px; }
+      .chip { width: 12px; height: 12px; }
+      .pgrp { font-size: 10px; }
+      .grpline { margin-top: 3px; gap: 5px; }
+      #center { padding: 6px 10px; }
+      #center .lbl { font-size: 8.5px; }
+      .scoreRow .s { font-size: 21px; }
+      .scoreRow { gap: 6px; }
+      #dashes i { width: 10px; height: 3px; }
+      #turnWrap { bottom: calc(10px + env(safe-area-inset-bottom)); width: 96vw; }
+      #turnPill { padding: 8px 14px; gap: 8px; }
+      #statusText { font-size: 14px; }
+      #turnPill .tdot::before { font-size: 14px; }
+      #turnHint { font-size: 12.5px; max-width: 92vw; }
+      #contact { width: 168px; height: 168px; }
+      #contactDot { width: 22px; height: 22px; }
+      .panel { padding: 22px 18px 18px; border-width: 8px; }
+      .panel h1 { font-size: 22px; }
+      #gpuModal .panel .sub { font-size: 13.5px; }
+    }
+    /* paisagem baixa (celular deitado): lobby em 2 colunas apertadas */
+    @media (max-height: 480px) and (min-width: 640px) {
+      .lbLeft { padding: 56px 10px 0 24px; gap: 8px; }
+      .lbTitle { font-size: 34px; } .lbTitle2 { font-size: 15px; }
+      .lbSub { display: none; }
+      .lbBottom { display: none; }
+      .lbCard { max-height: 88vh; padding: 14px 16px 12px; border-width: 7px; }
+      .lbCard h2 { font-size: 20px; }
+      .fieldLbl { margin: 10px 0 5px; }
+      .lbCard input { padding: 9px 12px; font-size: 15px; }
+      .btnMode { padding: 8px 6px; } .bmTitle { font-size: 16px; }
+      .orSep { margin: 10px 0 2px; }
+      .botRow { margin-top: 8px; } .botLvl { padding: 7px 4px; font-size: 11.5px; }
+      .cardHint { display: none; }
+      #scoreboard { transform: translateX(-50%) scale(.82); transform-origin: top center; }
+      #turnWrap { bottom: calc(6px + env(safe-area-inset-bottom)); }
     }
   </style>
 </head>
@@ -457,6 +564,23 @@
     </div>
 
     <div id="contact"><div id="contactDot"></div><div id="contactLbl">efeito / ponto de contato</div></div>
+
+    <!-- ===== controles TOUCH (só aparecem no celular) ===== -->
+    <div id="mobileCtrls">
+      <button id="mbMenu" class="mbBtn" aria-label="menu"><span>☰</span><i>menu</i></button>
+      <button id="mbTop" class="mbBtn" aria-label="ver de cima"><span>🔝</span><i>de cima</i></button>
+      <button id="mbCam" class="mbBtn" aria-label="altura da câmera"><span>📷</span><i>câmera</i></button>
+      <button id="mbSpin" class="mbBtn" aria-label="efeito"><span>🎯</span><i>efeito</i></button>
+      <button id="mbMusic" class="mbBtn" aria-label="próxima música"><span>🎵</span><i>música</i></button>
+    </div>
+    <div id="mbAimBtns">
+      <button id="mbLeft" class="mbAim" aria-label="girar mira à esquerda">◀</button>
+      <button id="mbRight" class="mbAim" aria-label="girar mira à direita">▶</button>
+    </div>
+    <div id="powerSlider" aria-label="força da tacada">
+      <div id="psTrack"><div id="psFill"></div><div id="psPct">0%</div><div id="psHandle">🎱</div></div>
+      <i>força ↓</i>
+    </div>
   </div>
 
   <div id="lobby" class="overlay">
@@ -656,6 +780,12 @@
           if (i >= PEER_SRCS.length) { done(); return; }
           loadScript(PEER_SRCS[i], function () { if (window.Peer) done(); else tryP(i + 1); }, function () { tryP(i + 1); });
         })(0);
+      }
+      // PWA: registra o service worker (cache offline + instalável)
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', function () {
+          navigator.serviceWorker.register('sw.js').catch(function () { /* http simples: sem PWA */ });
+        });
       }
       function startApp() {
         loadObjLoader(function () {

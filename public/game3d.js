@@ -805,6 +805,8 @@ const BIH_MOVE = 0.9;     // bola na mão: unidades por pixel
 const PULL_MAX = 300;     // puxada no feltro (toque)
 
 const amShooter = () => currentTurn === myNo && !game.gameOver;
+// Celular/tablet: dedo no lugar de mouse+teclado → botões touch no HUD.
+const IS_MOBILE = (window.matchMedia && matchMedia('(pointer: coarse)').matches) || 'ontouchstart' in window;
 // Pointer Lock persistente: o cursor fica OCULTO o tempo todo (só reaparece com
 // Esc) e recebemos movimento RELATIVO — gira o taco/câmera infinito, sem sair
 // da janela nem depender da posição do cursor.
@@ -954,28 +956,46 @@ function setPowerUI(p) {
   const t = document.getElementById('powerPct'); if (t) t.textContent = pct;
 }
 
-// ---- Toque (sem Ctrl): 1 dedo = puxar a branca; 2 dedos = girar ------------
-let touchCharging = false;
+// ---- Toque (padrão 8 Ball Pool): arrastar na MESA gira o taco;
+// FORÇA no slider lateral (segurar e puxar p/ baixo; soltar = tacada);
+// PINÇA = zoom. Sensibilidade própria do touch (não herda a do mouse). -----
+const TOUCH_AIM_SENS = 0.005;    // rad por px de arrasto horizontal
+let touchAiming = false;
+let pinch0 = 0, pinchZoom0 = 1; // distância inicial da pinça e zoom na largada
+function touchDist(e) {
+  const a = e.touches[0], b = e.touches[1];
+  return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY) || 1;
+}
 function onTouchStart(e) {
-  if (e.touches.length >= 2) { orbiting = true; lastMouse = { x: e.touches[0].clientX, y: e.touches[0].clientY }; return; }
+  if (e.touches.length >= 2) { // pinça: zoom da câmera
+    touchAiming = false;
+    pinch0 = touchDist(e); pinchZoom0 = zoom;
+    return;
+  }
   const t = e.touches[0]; lastMouse = { x: t.clientX, y: t.clientY };
   if (amShooter() && phase === 'aim') {
     if (ballInHand) { const f = screenToFelt(t.clientX, t.clientY); if (f && placeCue(f.x, f.y)) { ballInHand = false; sendCue(true); setStatus('Bola posicionada.'); } return; }
-    touchCharging = true; chargePower = 0; setPowerUI(0); return;
+    touchAiming = true; return;
   }
   orbiting = true;
 }
 function onTouchMove(e) {
-  const t = e.touches[0]; const cur = { x: t.clientX, y: t.clientY };
-  if (touchCharging) {
-    const felt = screenToFelt(cur.x, cur.y);
-    if (felt) { const c = cue(); const dx = c.x - felt.x, dy = c.y - felt.y, d = Math.hypot(dx, dy); if (d > 3) { aimDir = { x: dx / d, y: dy / d }; chargePower = Math.max(0, Math.min(1, d / PULL_MAX)); } setPowerUI(chargePower); sendAim(); }
+  if (e.touches.length >= 2 && pinch0) { // pinça: afastar dedos = aproximar câmera
+    zoom = Math.max(0.6, Math.min(1.8, pinchZoom0 * (pinch0 / touchDist(e))));
+    saveViewPrefs();
     return;
   }
-  lastMouse = cur; // câmera é automática (taco/topo); toque só mira/atira
+  const t = e.touches[0]; const cur = { x: t.clientX, y: t.clientY };
+  if (touchAiming && amShooter() && phase === 'aim' && !ballInHand) {
+    const dx = cur.x - lastMouse.x;
+    setAim(aimAngle + dx * TOUCH_AIM_SENS); // arrastar de lado = girar o taco
+    sendAim();
+  }
+  lastMouse = cur;
 }
-function onTouchEnd() {
-  if (touchCharging) { touchCharging = false; setPowerUI(0); const pw = chargePower; chargePower = 0; if (pw > 0.05) shoot(pw); return; }
+function onTouchEnd(e) {
+  if (e && e.touches && e.touches.length < 2) pinch0 = 0;
+  touchAiming = false;
   orbiting = false;
 }
 let lastAimSent = 0;
@@ -998,6 +1018,9 @@ function shoot(power) {
   if (strike.miscue) { strike = { vx: dir.x * power * MAX_SHOT * 0.15, vy: dir.y * power * MAX_SHOT * 0.15, wx: 0, wy: 0, wz: 0 }; game.lastMsg = 'Miscue! Tacada fraca.'; }
   c.vx = strike.vx; c.vy = strike.vy; c.wx = strike.wx; c.wy = strike.wy; c.wz = strike.wz;
   cueOffset = { a: 0, b: 0 }; endContact(); updateContactDot(); // efeito reseta ao centro após a tacada
+  // mobile: fecha a bola de efeito, se estava aberta
+  const ctEl = document.getElementById('contact'); if (ctEl) ctEl.classList.remove('show');
+  const msB = document.getElementById('mbSpin'); if (msB) msB.classList.remove('on');
   const snapshot = balls.map((b) => ({ n: b.n, x: b.x, y: b.y, vx: b.vx, vy: b.vy, wx: b.wx, wy: b.wy, wz: b.wz, potted: b.potted }));
   const shot = Physics.simulateShot(snapshot);
   send({ t: 'shot', segments: shot.segments, duration: shot.duration, events: shot.events, cueSpeed: shot.cueSpeed, finalBalls: shot.finalBalls });
@@ -1029,6 +1052,13 @@ function updateAimVisuals() {
   const showOpp = !amShooter() && phase === 'wait' && oppAim;
   // Widgets de força e efeito só aparecem na sua vez de mirar.
   document.getElementById('cueControls').classList.toggle('show', showMine);
+  if (IS_MOBILE) {
+    document.body.classList.toggle('ingame', phase !== 'lobby');
+    const fine = document.getElementById('mbAimBtns');
+    if (fine) fine.classList.toggle('show', showMine);
+    const sb = document.getElementById('powerSlider');
+    if (sb) sb.classList.toggle('show', showMine);
+  }
   if (!showMine && !showOpp) { hideAim(); return; }
   const c = cue(); if (!c || c.potted) { hideAim(); return; }
   const dir = showMine ? aimDir : { x: Math.cos(oppAim.ang), y: Math.sin(oppAim.ang) };
@@ -1096,7 +1126,8 @@ function bannerText() {
       : 'FIM DE JOGO';
   }
   if (currentTurn === myNo) {
-    if (ballInHand) return 'BOLA NA MÃO';
+    if (ballInHand) return IS_MOBILE ? 'BOLA NA MÃO — TOQUE NO PANO' : 'BOLA NA MÃO';
+    if (IS_MOBILE) return 'SUA VEZ — ARRASTA P/ MIRAR';
     if (!isLocked()) return 'CLIQUE PARA MIRAR';
     return 'SUA VEZ';
   }
@@ -1462,6 +1493,95 @@ function init() {
 
   document.getElementById('rematchBtn').addEventListener('click', () => { document.getElementById('rematchMsg').textContent = 'Aguardando o adversário...'; doRematch(true); });
   document.getElementById('ctrlBtn').addEventListener('click', toggleControls);
+
+  // ================= CONTROLES TOUCH (só no celular) =================
+  if (IS_MOBILE) {
+    document.body.classList.add('mobile');
+    const $ = (id) => document.getElementById(id);
+    // ☰ menu de pausa
+    $('mbMenu').addEventListener('click', () => { if (window.OrbitMenu) OrbitMenu.open(); });
+    // 🔝 ver de cima (toggle, não precisa segurar como o Tab)
+    $('mbTop').addEventListener('click', () => {
+      topOverride = !topOverride;
+      $('mbTop').classList.toggle('on', topOverride);
+    });
+    // 📷 altura da câmera: alterna rente → padrão → alto
+    $('mbCam').addEventListener('click', () => {
+      camPitch = camPitch < 0.3 ? 0.48 : (camPitch < 0.7 ? 0.9 : 0.12);
+      saveViewPrefs();
+    });
+    // 🎯 efeito: abre a bola grande; arrasta nela p/ escolher o ponto
+    $('mbSpin').addEventListener('click', () => {
+      const c = document.getElementById('contact');
+      c.classList.toggle('show');
+      $('mbSpin').classList.toggle('on', c.classList.contains('show'));
+    });
+    // 🎵 próxima música
+    $('mbMusic').addEventListener('click', () => {
+      if (window.OrbitAudio && OrbitAudio.nextMusic) { const i = OrbitAudio.nextMusic(); if (i) musicToast('♪ ' + i.title); }
+    });
+    // Toque na BOLA DE EFEITO: posição absoluta do dedo vira (a,b)
+    const contactEl = document.getElementById('contact');
+    const setSpinFromTouch = (ev) => {
+      const t = ev.touches ? ev.touches[0] : ev;
+      const r = contactEl.getBoundingClientRect();
+      let a = ((t.clientX - r.left) / r.width - 0.5) * 2 * Physics.MAX_OFFSET * 1.15;
+      let b = -((t.clientY - r.top) / r.height - 0.5) * 2 * Physics.MAX_OFFSET * 1.15;
+      const m = Math.hypot(a, b), MX = Physics.MAX_OFFSET;
+      if (m > MX) { a = a / m * MX; b = b / m * MX; }
+      cueOffset = { a, b }; updateContactDot();
+      ev.preventDefault();
+    };
+    contactEl.addEventListener('touchstart', setSpinFromTouch, { passive: false });
+    contactEl.addEventListener('touchmove', setSpinFromTouch, { passive: false });
+    // ◀ ▶ mira fina: segurar gira devagar (precisão que o dedo não dá)
+    const holdRotate = (btnId, dir) => {
+      const el = $(btnId);
+      let iv = null;
+      const start = (ev) => { ev.preventDefault(); if (iv) return; iv = setInterval(() => { setAim(aimAngle + dir * 0.006); sendAim(); }, 16); };
+      const stop = () => { clearInterval(iv); iv = null; };
+      el.addEventListener('touchstart', start, { passive: false });
+      el.addEventListener('touchend', stop); el.addEventListener('touchcancel', stop);
+      el.addEventListener('mousedown', start); el.addEventListener('mouseup', stop); el.addEventListener('mouseleave', stop);
+    };
+    holdRotate('mbLeft', -1);
+    holdRotate('mbRight', 1);
+    // SLIDER DE FORÇA (estilo 8 Ball Pool): pressiona o trilho, PUXA PRA
+    // BAIXO até a força desejada e SOLTA = tacada. Voltar ao topo cancela.
+    const slider = $('powerSlider'), track = $('psTrack'),
+          fill = $('psFill'), handle = $('psHandle'), psPct = $('psPct');
+    let charging = false;
+    const setSlider = (pw) => {
+      fill.style.height = (pw * 100) + '%';
+      handle.style.top = (pw * 100) + '%';
+      psPct.textContent = Math.round(pw * 100) + '%';
+      psPct.style.top = (pw * 100) + '%';
+    };
+    const powerFromTouch = (ev) => {
+      const r = track.getBoundingClientRect();
+      return Math.max(0, Math.min(1, (ev.touches[0].clientY - r.top) / r.height));
+    };
+    slider.addEventListener('touchstart', (ev) => {
+      ev.preventDefault();
+      if (!(amShooter() && phase === 'aim' && !ballInHand)) return;
+      charging = true; slider.classList.add('on');
+      chargePower = powerFromTouch(ev); setPowerUI(chargePower); setSlider(chargePower); sendAim();
+    }, { passive: false });
+    slider.addEventListener('touchmove', (ev) => {
+      ev.preventDefault();
+      if (!charging) return;
+      chargePower = powerFromTouch(ev); setPowerUI(chargePower); setSlider(chargePower); sendAim();
+    }, { passive: false });
+    const releaseShot = (ev) => {
+      if (ev) ev.preventDefault();
+      if (!charging) return;
+      charging = false; slider.classList.remove('on');
+      const pw = chargePower; chargePower = 0; setPowerUI(0); setSlider(0);
+      if (pw > 0.05) shoot(pw); else sendAim(); // soltar no topo = cancela
+    };
+    slider.addEventListener('touchend', releaseShot, { passive: false });
+    slider.addEventListener('touchcancel', releaseShot, { passive: false });
+  }
 
   requestAnimationFrame(loop);
 }
