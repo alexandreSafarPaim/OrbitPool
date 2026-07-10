@@ -73,7 +73,10 @@ window.OrbitNet = {
       this._onMsg({ t: 'waiting' });
       if (this._slots === 4) this._emitLobby();
       peer.on('connection', (conn) => {
-        if (this._guests.length >= this._slots - 1 || this._started) {
+        const canJoin = !this._started
+          ? this._guests.length < this._slots - 1
+          : Object.keys(this._lost || {}).length > 0; // partida rolando: só reconexão em vaga
+        if (!canJoin) {
           conn.on('open', () => { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} });
           return;
         }
@@ -100,13 +103,29 @@ window.OrbitNet = {
       if (!m || !m.t) return;
       if (m.t === '_hello') {
         if (conn._no) return; // hello duplicado
-        const no = this._nextNo();
-        if (!no) { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} return; }
+        let no = 0;
+        if (this._started) {
+          // RECONEXÃO: partida em andamento — só entra quem ocupa uma vaga
+          // deixada por alguém que caiu (prefere a vaga com o MESMO nome).
+          const lost = Object.entries(this._lost || {});
+          if (!lost.length) { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} return; }
+          const byName = lost.find(([, nm]) => nm === (m.name || ''));
+          no = +(byName ? byName[0] : lost[0][0]);
+          delete this._lost[no];
+        } else {
+          no = this._nextNo();
+          if (!no) { try { conn.send({ t: 'full' }); conn.close(); } catch (e) {} return; }
+        }
         conn._no = no; conn._name = (m.name || 'Jogador').slice(0, 20);
         this._guests.push(conn);
         this._roster.push({ no, name: conn._name });
         try { conn.send({ t: 'assign', playerNo: no, slots: this._slots }); } catch (e) {}
-        if (this._slots === 2) {
+        if (this._started) {
+          // avisa todo mundo: quem tem o menor nº manda o snapshot (resync)
+          const msg = { t: 'rejoined', no, name: conn._name };
+          this._onMsg(msg);
+          for (const g of this._guests) { if (g !== conn && g.open) { try { g.send(msg); } catch (e) {} } }
+        } else if (this._slots === 2) {
           // 1v1: começa direto (comportamento original)
           this._oppName = conn._name; this._started = true;
           this._onMsg({ t: 'start', opponent: this._oppName, startTurn: 1 });
@@ -131,6 +150,9 @@ window.OrbitNet = {
     this._guests.splice(i, 1);
     this._roster = this._roster.filter((p) => p.no !== conn._no);
     if (this._started) {
+      // guarda a vaga p/ reconexão pelo código da sala
+      this._lost = this._lost || {};
+      this._lost[conn._no] = conn._name || '';
       const m = { t: 'peer_left', no: conn._no };
       this._onMsg(m);
       for (const g of this._guests) { if (g.open) { try { g.send(m); } catch (e) {} } }

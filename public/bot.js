@@ -24,7 +24,13 @@ window.OrbitBot = (function () {
     iniciante: { sigmaAng: 0.070, sigmaPow: 0.16, english: 0.06, minCos: 0.45, mc: 0,  posW: 0,   pickTop: 4, pickRandom: 0.60, think: [700, 1100] },
     amador:    { sigmaAng: 0.021, sigmaPow: 0.08, english: 0.02, minCos: 0.30, mc: 6,  posW: 25,  pickTop: 3, pickRandom: 0.25, think: [800, 1300] },
     pro:       { sigmaAng: 0.010, sigmaPow: 0.045,english: 0.00, minCos: 0.20, mc: 12, posW: 60,  pickTop: 2, pickRandom: 0.06, think: [900, 1500] },
-    mineirinho: { sigmaAng: 0.0009,sigmaPow: 0.010,english: 0.00, minCos: 0.10, mc: 20, posW: 140, pickTop: 1, pickRandom: 0.00, think: [700, 1200] },
+    // ELITE: busca em 2 estágios (base → variantes de efeito nos melhores),
+    // tacadas de tabela quando bloqueado, defesa que esconde a branca e
+    // orçamento de tempo maior. smart=true liga tudo isso.
+    mineirinho: { sigmaAng: 0.0006,sigmaPow: 0.008,english: 0.00, minCos: 0.06, mc: 10, posW: 170, pickTop: 1, pickRandom: 0.00, think: [1100, 1800],
+      smart: true, budget: 2300,
+      spins: [0, -0.24, 0.3, -0.42],   // stun, draw, follow, draw fundo
+      powers: [1, 0.7, 1.2] },          // multiplicadores sobre a força base
   };
 
   const groupOf = (n) => (n === 8 ? 'eight' : (n >= 1 && n <= 7 ? 'solid' : (n >= 9 && n <= 15 ? 'stripe' : null)));
@@ -145,7 +151,7 @@ window.OrbitBot = (function () {
   // Decisão principal.
   function decide(state) {
     const L = LEVELS[state.level] || LEVELS.amador;
-    const deadline = Date.now() + 1300; // orçamento total da decisão (ms)
+    const deadline = Date.now() + (L.budget || 1300); // orçamento total da decisão (ms)
     const balls = state.balls;
     let cue = balls.find((b) => b.n === 0) || { x: W * 0.25, y: H / 2 };
     let place = null;
@@ -190,6 +196,7 @@ window.OrbitBot = (function () {
     const over = () => deadline && Date.now() > deadline;
     const ctx = { group: state.group, open: state.open, legalFirst: legalFirstSet(balls, state.group, state.open), posW: L.posW };
     const cand = [];
+    const geoCands = []; // linhas geométricas válidas (p/ 2º estágio do smart)
     outer:
     for (const T of targets(balls, state.group, state.open)) {
       for (const p of POCKETS()) {
@@ -204,6 +211,13 @@ window.OrbitBot = (function () {
         if (!pathClear(balls, cue.x, cue.y, gx, gy, T.n, 2 * R - 2)) continue;
         if (!pathClear(balls, T.x, T.y, p.x, p.y, T.n, R + 2)) continue;
         const power = clamp(0.30 + 0.00075 * (dcg + 1.5 * dop) + (1 - cos) * 0.35, 0.32, 0.98);
+        if (L.smart && !quick) {
+          // ESTÁGIO 1 (elite): só a tacada-base por linha; variantes de efeito
+          // ficam para o estágio 2, apenas nas linhas promissoras (orçamento).
+          const sc = scoreShot(balls, cue, T, ang, power, 0, 0, ctx);
+          if (sc) { const c = { ang, power, a: 0, b: 0, T, base: power, ...sc }; cand.push(c); geoCands.push(c); }
+          continue;
+        }
         // Variantes por candidata (níveis com MC): força cheia × mais suave, e
         // centro × stun (b<0). Suave entra mansa na caçapa (não chacoalha nos
         // jaws); stun segura a branca no tiro reto (evita scratch de follow).
@@ -215,7 +229,32 @@ window.OrbitBot = (function () {
         }
       }
     }
-    if (!cand.length) return safety(balls, cue, state, L, ctx);
+    // ESTÁGIO 2 (elite): expande efeito/força nas melhores linhas — inclui as
+    // que ENCAÇAPAM mas cometem scratch (o efeito certo resolve o scratch).
+    if (L.smart && !quick && geoCands.length) {
+      const pool = geoCands
+        .slice()
+        .sort((x, y) => (y.score + (y.info && y.info.potted.includes(y.T.n) ? 1500 : 0)) -
+                        (x.score + (x.info && x.info.potted.includes(x.T.n) ? 1500 : 0)))
+        .slice(0, 6);
+      for (const g of pool) {
+        if (over()) break;
+        for (const pm of (L.powers || [1])) {
+          for (const sb of (L.spins || [0])) {
+            if (pm === 1 && sb === 0) continue; // já é a base
+            if (over()) break;
+            const pw = clamp(g.base * pm, 0.3, 1);
+            const sc = scoreShot(balls, cue, g.T, g.ang, pw, 0, sb, ctx);
+            if (sc) cand.push({ ang: g.ang, power: pw, a: 0, b: sb, T: g.T, ...sc });
+          }
+        }
+      }
+    }
+    // Elite bloqueado? tenta TACADAS DE TABELA (banco de 1 tabela) antes da defesa.
+    if (L.smart && !quick && (!cand.length || Math.max(...cand.map((c) => c.score)) < 0)) {
+      bankCandidates(balls, cue, state, L, ctx, cand, over);
+    }
+    if (!cand.length) return L.smart && !quick ? smartSafety(balls, cue, state, L, ctx, over) : safety(balls, cue, state, L, ctx);
     cand.sort((x, y) => y.score - x.score);
 
     // Monte Carlo nos melhores (níveis altos): reestima com ruído de mira.
@@ -235,7 +274,9 @@ window.OrbitBot = (function () {
       cand.sort((x, y) => y.score - x.score);
     }
     // Todas as candidatas ruins (scratch/erro quase certo)? Melhor jogar segurança.
-    if (cand[0].score < -400) return safety(balls, cue, state, L, ctx);
+    if (cand[0].score < -400) {
+      return L.smart && !quick ? smartSafety(balls, cue, state, L, ctx, over) : safety(balls, cue, state, L, ctx);
+    }
 
     // Escolha imperfeita nos níveis baixos.
     let pick = cand[0];
@@ -243,6 +284,74 @@ window.OrbitBot = (function () {
       pick = cand[Math.floor(Math.random() * Math.min(L.pickTop, cand.length))];
     }
     return pick;
+  }
+
+  // TACADAS DE TABELA (elite): a bola-alvo vai à caçapa refletida numa das 4
+  // tabelas (banco de 1 tabela). A simulação real valida cada tentativa.
+  function bankCandidates(balls, cue, state, L, ctx, cand, over) {
+    for (const T of targets(balls, state.group, state.open)) {
+      // 2 caçapas mais próximas do alvo bastam (orçamento)
+      const ps = POCKETS().slice().sort((p, q) => hyp(p.x - T.x, p.y - T.y) - hyp(q.x - T.x, q.y - T.y)).slice(0, 3);
+      for (const p of ps) {
+        for (const mir of [{ x: -p.x, y: p.y }, { x: 2 * W - p.x, y: p.y }, { x: p.x, y: -p.y }, { x: p.x, y: 2 * H - p.y }]) {
+          if (over && over()) return;
+          const dxp = mir.x - T.x, dyp = mir.y - T.y, dop = hyp(dxp, dyp) || 1;
+          const gx = T.x - (dxp / dop) * 2 * R, gy = T.y - (dyp / dop) * 2 * R;
+          const dxc = gx - cue.x, dyc = gy - cue.y, dcg = hyp(dxc, dyc) || 1;
+          const cos = (dxc / dcg) * (dxp / dop) + (dyc / dcg) * (dyp / dop);
+          if (cos < 0.25) continue;
+          if (!pathClear(balls, cue.x, cue.y, gx, gy, T.n, 2 * R - 2)) continue;
+          const ang = Math.atan2(dyc, dxc);
+          const power = clamp(0.36 + 0.0007 * (dcg + 1.4 * dop), 0.4, 1);
+          const sc = scoreShot(balls, cue, T, ang, power, 0, 0, ctx);
+          if (sc) cand.push({ ang, power, a: 0, b: 0, T, ...sc });
+        }
+      }
+    }
+  }
+
+  // DEFESA elite: toca de leve numa bola legal escolhendo a variação que deixa
+  // o ADVERSÁRIO na pior situação (branca longe/sem linha para as bolas dele),
+  // sem falta e sem scratch. Se tudo bloqueado, tenta chegar por tabela (kick).
+  function smartSafety(balls, cue, state, L, ctx, over) {
+    const legal = targets(balls, state.group, state.open);
+    const oppBalls = balls.filter((b) => !b.potted && b.n !== 0 && b.n !== 8 && !legal.some((t) => t.n === b.n));
+    const evalSafety = (ang, power) => {
+      const sc = scoreShot(balls, cue, legal[0] || { n: 8 }, ang, power, 0, 0, ctx);
+      if (!sc || !sc.info) return null;
+      if (sc.info.cuePotted || sc.info.firstHit == null || !ctx.legalFirst(sc.info.firstHit)) return null; // falta
+      // quanto PIOR para o adversário, melhor: sem jogada fácil e branca longe
+      const oppPlay = positionScore(sc.info.cueF, oppBalls.length ? oppBalls : balls.filter((b) => !b.potted && b.n === 8));
+      let nearOpp = 1e9;
+      for (const ob of oppBalls) nearOpp = Math.min(nearOpp, hyp(sc.info.cueF.x - ob.x, sc.info.cueF.y - ob.y));
+      let s = -600 * oppPlay + Math.min(nearOpp, 400) * 0.3;
+      for (const n of sc.info.potted) s += legal.some((t) => t.n === n) ? 60 : -200; // pot próprio no safety é bônus
+      return { ang, power, a: 0, b: 0, T: legal[0], score: s };
+    };
+    let best = null;
+    // toques finos/grossos e suaves em cada bola legal
+    for (const t of legal) {
+      const d = hyp(t.x - cue.x, t.y - cue.y) || 1;
+      const base = Math.atan2(t.y - cue.y, t.x - cue.x);
+      const spread = Math.atan2(1.6 * R, d); // varia do toque cheio ao fino
+      for (const off of [-1, -0.5, 0, 0.5, 1]) {
+        for (const pw of [0.3, 0.45]) {
+          if (over && over()) break;
+          const r = evalSafety(base + off * spread, pw);
+          if (r && (!best || r.score > best.score)) best = r;
+        }
+      }
+    }
+    // tudo bloqueado (nenhum toque legal direto)? kick por tabela na bola legal mais próxima
+    if (!best && legal.length) {
+      const t = legal.slice().sort((a2, b2) => hyp(a2.x - cue.x, a2.y - cue.y) - hyp(b2.x - cue.x, b2.y - cue.y))[0];
+      for (const mir of [{ x: t.x, y: -t.y }, { x: t.x, y: 2 * H - t.y }, { x: -t.x, y: t.y }, { x: 2 * W - t.x, y: t.y }]) {
+        if (over && over()) break;
+        const r = evalSafety(Math.atan2(mir.y - cue.y, mir.x - cue.x), 0.55);
+        if (r && (!best || r.score > best.score)) best = r;
+      }
+    }
+    return best || safety(balls, cue, state, L, ctx);
   }
 
   // Defesa: sem encaçapada boa, bate de leve na bola legal mais próxima.
