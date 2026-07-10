@@ -10,11 +10,11 @@
    ========================================================================= */
 'use strict';
 
-const VERSION = 'orbitpool-v1';
+const VERSION = 'orbitpool-v3';
 const SHELL = [
   './',
   'index.html',
-  'physics.js', 'game3d.js', 'bot.js', 'net.js', 'audio.js', 'menu.js',
+  'physics.js', 'game3d.js', 'bot.js', 'net.js', 'audio.js', 'menu.js', 'i18n.js',
   'table3d_collider.js', 'GLTFLoader.js', 'OBJLoader.js',
   'favicon.svg', 'icon-192.png', 'icon-512.png', 'site.webmanifest',
 ];
@@ -23,7 +23,9 @@ const SKIP = /\/music\/|\/env\/cube\//; // pesados demais p/ cache
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(VERSION)
-      .then((c) => c.addAll(SHELL))
+      // um 404 em UM arquivo não pode brickar a atualização inteira (addAll
+      // rejeita tudo) — cacheia individualmente e ignora falhas pontuais
+      .then((c) => Promise.all(SHELL.map((u) => c.add(u).catch(() => {}))))
       .then(() => self.skipWaiting())
   );
 });
@@ -43,7 +45,7 @@ self.addEventListener('fetch', (e) => {
   if (url.origin !== location.origin) return;       // CDNs/fonts: comportamento padrão
   if (SKIP.test(url.pathname)) return;               // música/ambiente: só rede
 
-  // stale-while-revalidate: responde do cache e atualiza por trás
+  const isCode = /\.(js|html)$/.test(url.pathname) || url.pathname.endsWith('/');
   e.respondWith(
     caches.open(VERSION).then((cache) =>
       cache.match(req).then((cached) => {
@@ -52,8 +54,11 @@ self.addEventListener('fetch', (e) => {
             if (res && res.ok) cache.put(req, res.clone());
             return res;
           })
-          .catch(() => cached); // offline: fica no cache (ou falha se nunca visto)
-        return cached || fetching;
+          .catch(() => cached); // offline: usa o cache (ou falha se nunca visto)
+        // CÓDIGO (html/js): NETWORK-FIRST — online sempre roda a versão mais
+        // nova (senão o jogador testa com JS velho); offline cai pro cache.
+        // ASSETS (texturas/glb/fontes): stale-while-revalidate (rápido).
+        return isCode ? fetching : (cached || fetching);
       })
     )
   );

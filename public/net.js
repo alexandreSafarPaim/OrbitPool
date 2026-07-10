@@ -14,6 +14,9 @@
    ========================================================================= */
 'use strict';
 
+// Tradução (i18n.js): mensagens de erro visíveis ao usuário.
+const NET_T = (k, p) => (window.OrbitI18N ? OrbitI18N.t(k, p) : k);
+
 window.OrbitNet = {
   mode: 'p2p',
   _onMsg: null, _myName: '', _oppName: '',
@@ -36,7 +39,7 @@ window.OrbitNet = {
 
   _begin(name, onMsg) {
     this.mode = /[?&]server\b/.test(location.search) ? 'server' : 'p2p';
-    this._myName = name || 'Jogador'; this._onMsg = onMsg; this._oppName = '';
+    this._myName = name || NET_T('hud.player'); this._onMsg = onMsg; this._oppName = '';
     this._guests = []; this._roster = null; this._started = false;
   },
   _peerId(code) { return 'orbitpool-' + String(code).toLowerCase().replace(/[^a-z0-9]/g, ''); },
@@ -59,13 +62,13 @@ window.OrbitNet = {
     this._ws = ws;
     ws.onopen = () => ws.send(JSON.stringify({ t: 'join', room: code, name: this._myName, slots: slots || undefined }));
     ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } this._onMsg(m); };
-    ws.onclose = () => this._onMsg({ t: '_neterror', msg: 'Conexão com o servidor encerrada. Recarregue a página.' });
-    ws.onerror = () => this._onMsg({ t: '_neterror', msg: 'Não foi possível conectar ao servidor.' });
+    ws.onclose = () => this._onMsg({ t: '_neterror', msg: NET_T('net.closed') });
+    ws.onerror = () => this._onMsg({ t: '_neterror', msg: NET_T('net.serverFail') });
   },
 
   // ---- P2P via PeerJS (host = hub em estrela p/ até 4 jogadores) -----------
   _p2pHost(code) {
-    if (!window.Peer) return this._onMsg({ t: '_neterror', msg: 'A rede P2P (PeerJS) não carregou. Verifique sua conexão/bloqueadores.' });
+    if (!window.Peer) return this._onMsg({ t: '_neterror', msg: NET_T('net.noPeer') });
     const peer = new Peer(this._peerId(code)); this._peer = peer;
     this._roster = [{ no: 1, name: this._myName }];
     peer.on('open', () => {
@@ -85,8 +88,8 @@ window.OrbitNet = {
     });
     peer.on('error', (err) => {
       const t = ((err && err.type) || err) + '';
-      if (/unavailable|taken/i.test(t)) this._onMsg({ t: '_neterror', msg: 'Esse código de sala já está em uso. Crie outra sala.' });
-      else this._onMsg({ t: '_neterror', msg: 'Erro de rede: ' + t });
+      if (/unavailable|taken/i.test(t)) this._onMsg({ t: '_neterror', msg: NET_T('net.codeTaken') });
+      else this._onMsg({ t: '_neterror', msg: NET_T('net.error', { err: t }) });
     });
   },
   _nextNo() { // menor playerNo livre (2..slots)
@@ -163,7 +166,7 @@ window.OrbitNet = {
     }
   },
   _p2pJoin(code) {
-    if (!window.Peer) return this._onMsg({ t: '_neterror', msg: 'A rede P2P (PeerJS) não carregou. Verifique sua conexão/bloqueadores.' });
+    if (!window.Peer) return this._onMsg({ t: '_neterror', msg: NET_T('net.noPeer') });
     const peer = new Peer(); this._peer = peer;
     peer.on('open', () => {
       const conn = peer.connect(this._peerId(code), { reliable: true });
@@ -172,12 +175,12 @@ window.OrbitNet = {
       conn.on('data', (m) => { if (m && m.t) this._onMsg(m); });
       conn.on('close', () => this._onMsg({ t: 'peer_left' }));
       conn.on('error', () => this._onMsg({ t: 'peer_left' }));
-      setTimeout(() => { if (!this._conn || !this._conn.open) this._onMsg({ t: '_neterror', msg: 'Não encontrei a sala. Confira o código (o host precisa ter criado a sala e estar online).' }); }, 9000);
+      setTimeout(() => { if (!this._conn || !this._conn.open) this._onMsg({ t: '_neterror', msg: NET_T('net.timeout') }); }, 9000);
     });
     peer.on('error', (err) => {
       const t = ((err && err.type) || err) + '';
-      if (/peer-unavailable/i.test(t)) this._onMsg({ t: '_neterror', msg: 'Sala não encontrada. Confira o código com o host.' });
-      else this._onMsg({ t: '_neterror', msg: 'Erro de rede: ' + t });
+      if (/peer-unavailable/i.test(t)) this._onMsg({ t: '_neterror', msg: NET_T('net.notFound') });
+      else this._onMsg({ t: '_neterror', msg: NET_T('net.error', { err: t }) });
     });
   },
 };
