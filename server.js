@@ -12,7 +12,7 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = path.join(__dirname, 'public');
+const PUBLIC_DIR = path.resolve(__dirname, process.env.PUBLIC_DIR || 'public');
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 const MIME = {
@@ -47,7 +47,14 @@ const server = http.createServer((req, res) => {
       return res.end('Not found');
     }
     const ext = path.extname(filePath).toLowerCase();
-    res.writeHead(200, { 'Content-Type': MIME[ext] || 'application/octet-stream' });
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      // security headers (no deploy em Pages, o dist/_headers cobre isso)
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+      'Referrer-Policy': 'strict-origin-when-cross-origin',
+      'Permissions-Policy': 'camera=(), microphone=(), geolocation=()',
+    });
     res.end(data);
   });
 });
@@ -129,8 +136,10 @@ server.on('upgrade', (req, socket) => {
 
   const conn = new Conn(socket);
 
+  const MAX_BUFFER = 1024 * 1024; // 1MB: maior 'shot'/'resync' real fica bem abaixo
   socket.on('data', (chunk) => {
     conn.buffer = Buffer.concat([conn.buffer, chunk]);
+    if (conn.buffer.length > MAX_BUFFER) { conn.close(); return; } // anti-DoS
     parseFrames(conn);
   });
   // 'end' (FIN) É o evento que chega quando o outro lado fecha de forma
@@ -158,6 +167,7 @@ function parseFrames(conn) {
       len = Number(buf.readBigUInt64BE(2));
       offset = 10;
     }
+    if (len > 1024 * 1024) { conn.close(); return; } // frame gigante = ataque
 
     let maskKey;
     if (masked) {
