@@ -564,6 +564,7 @@ function fireShotSounds() {
 
 function endShot() {
   const shot = currentShot; currentShot = null;
+  cueDragTarget = null; // o estado final da tacada manda a partir daqui
   for (const fb of shot.finalBalls) { const b = ballByN(fb.n); if (b) { b.x = fb.x; b.y = fb.y; b.potted = fb.potted; b.vx = b.vy = b.wx = b.wy = b.wz = 0; } }
   const result = evaluateShot(deriveRuleEvents(shot.events));
   currentTurn = result.nextTurn; ballInHand = result.ballInHand;
@@ -611,13 +612,20 @@ function handleNet(msg) {
       break;
     case 'start': applyStart(msg); break;
     case 'shot': {
+      oppAim = null; oppAimTarget = null; cueDragTarget = null; // fim da mira remota
       const shot = { duration: msg.duration, segments: msg.segments, events: msg.events, cueSpeed: msg.cueSpeed, finalBalls: msg.finalBalls };
       if (phase === 'sim' && currentShot) shotQueue.push(shot); else startPlayback(shot);
       break;
     }
-    case 'aim': oppAim = msg.a; break;
-    case 'ballcue': // outro jogador reposicionando a branca — reflete em tempo real
-      if (currentTurn !== myNo) { const c = cue(); if (c) { c.x = msg.x; c.y = msg.y; c.potted = false; c._px = c.x; c._py = c.y; } }
+    case 'aim': // mira do adversário: vira ALVO — o loop interpola (rede ~25Hz → 60fps)
+      oppAimTarget = msg.a;
+      if (!oppAim) oppAim = { ang: msg.a.ang, pow: msg.a.pow || 0 };
+      break;
+    case 'ballcue': // outro jogador reposicionando a branca — desliza até o alvo
+      if (currentTurn !== myNo) {
+        const c = cue();
+        if (c) { c.potted = false; cueDragTarget = { x: msg.x, y: msg.y }; }
+      }
       break;
     case 'peer_left':
       if (!game.gameOver) setStatus((msg.no ? playerName(msg.no) : 'Adversário') + ' saiu — ele pode voltar entrando com o código da sala.');
@@ -779,6 +787,15 @@ const feltPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0); // Y=0
 let aimAngle = 0;
 let aimDir = { x: 1, y: 0 };
 let chargePower = 0, oppAim = null, ctrlCharging = false, chargeAccum = 0, orbiting = false;
+// Interpolação da mira/arrasto REMOTOS: a rede manda ~25Hz; o loop desliza os
+// valores exibidos até esses alvos a 60fps (mascara o "travado" do P2P).
+let oppAimTarget = null, cueDragTarget = null;
+function lerpAngle(a, b, t) {
+  let d = (b - a) % (Math.PI * 2);
+  if (d > Math.PI) d -= Math.PI * 2;
+  if (d < -Math.PI) d += Math.PI * 2;
+  return a + d * t;
+}
 let contactMode = false;
 const AIM_SENS = 0.0045;  // rad por pixel de mouse (giro do taco)
 const CONTACT_SENS = 0.004; // efeito por pixel (Shift)
@@ -963,12 +980,12 @@ function onTouchEnd() {
 }
 let lastAimSent = 0;
 function sendAim() {
-  const now = performance.now(); if (now - lastAimSent < 60) return; lastAimSent = now;
+  const now = performance.now(); if (now - lastAimSent < 40) return; lastAimSent = now; // ~25Hz (interpolado no receptor)
   send({ t: 'aim', a: { ang: Math.atan2(aimDir.y, aimDir.x), pow: chargePower } });
 }
 let lastCueSent = 0;
 function sendCue(force) {
-  const now = performance.now(); if (!force && now - lastCueSent < 50) return; lastCueSent = now;
+  const now = performance.now(); if (!force && now - lastCueSent < 40) return; lastCueSent = now; // ~25Hz (interpolado no receptor)
   const c = cue(); if (c) send({ t: 'ballcue', x: c.x, y: c.y });
 }
 
@@ -1129,6 +1146,7 @@ function startGame() {
   makeBalls();
   game.open = true; game.groups = { 1: null, 2: null }; game.gameOver = false; game.winner = 0; game.lastMsg = '';
   ballInHand = false; cueOffset = { a: 0, b: 0 }; currentShot = null; shotQueue = []; updateContactDot();
+  oppAim = null; oppAimTarget = null; cueDragTarget = null;
   setAim(0);
   phase = currentTurn === myNo ? 'aim' : 'wait';
   if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
@@ -1237,6 +1255,22 @@ function loop(ts) {
     for (let i = 0; i < balls.length; i++) { balls[i].x = states[i].x; balls[i].y = states[i].y; balls[i].potted = states[i].potted; }
     fireShotSounds();
     if (shotElapsed >= currentShot.duration) endShot();
+  } else {
+    // Suavização dos movimentos REMOTOS (taco do adversário / bola na mão):
+    // desliza ~95% do caminho em ~65ms — fluido sem atraso perceptível.
+    const k = 1 - Math.pow(0.0005, dt);
+    if (oppAim && oppAimTarget) {
+      oppAim.ang = lerpAngle(oppAim.ang, oppAimTarget.ang, k);
+      oppAim.pow = (oppAim.pow || 0) + ((oppAimTarget.pow || 0) - (oppAim.pow || 0)) * k;
+    }
+    if (cueDragTarget && currentTurn !== myNo) {
+      const c = cue();
+      if (c && !c.potted) {
+        const dx = cueDragTarget.x - c.x, dy = cueDragTarget.y - c.y;
+        if (Math.hypot(dx, dy) > 250) { c.x = cueDragTarget.x; c.y = cueDragTarget.y; c._px = c.x; c._py = c.y; } // teleporte: não deslizar
+        else { c.x += dx * k; c.y += dy * k; }
+      }
+    }
   }
   syncMeshes();
   updateAimVisuals();
