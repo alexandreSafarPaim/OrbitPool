@@ -15,9 +15,103 @@ window.OrbitI18N = (function () {
   const LSKEY = 'orbitpool.lang';
   const SUPPORTED = ['en', 'pt', 'es', 'fr'];
   const NAMES = { en: 'English', pt: 'Português', es: 'Español', fr: 'Français' };
+  const OGLOCALE = { en: 'en_US', pt: 'pt_BR', es: 'es_ES', fr: 'fr_FR' };
+  const CANON_BASE = 'https://orbitpool.com.br/';
 
   // ---- Dicionário: chave → { en, pt, es, fr } ------------------------------
   const D = {
+    // SEO — título e descrição por idioma (aplicados no <head> por updateHead)
+    'meta.title': {
+      pt: 'OrbitPool — Sinuca 8-Ball 3D Multiplayer Online Grátis',
+      en: 'OrbitPool — Free Online 3D 8-Ball Pool Multiplayer',
+      es: 'OrbitPool — Billar 8-Ball 3D Multijugador Online Gratis',
+      fr: 'OrbitPool — Billard 8-Ball 3D Multijoueur en Ligne Gratuit',
+    },
+    'meta.desc': {
+      pt: 'OrbitPool é um jogo de sinuca (8-Ball) 3D multiplayer online e gratuito. Jogue no navegador, sem instalar e sem cadastro: crie uma sala, envie o código a um amigo e joguem em tempo real.',
+      en: 'OrbitPool is a free online 3D 8-Ball pool game you play in the browser — no install, no sign-up. Create a room, send the code to a friend and play real-time multiplayer.',
+      es: 'OrbitPool es un juego de billar (8-Ball) 3D multijugador online y gratis. Juega en el navegador, sin instalar y sin registro: crea una sala, envía el código a un amigo y jueguen en tiempo real.',
+      fr: 'OrbitPool est un jeu de billard (8-Ball) 3D multijoueur en ligne et gratuit. Jouez dans le navigateur, sans installation ni inscription : créez une salle, envoyez le code à un ami et jouez en temps réel.',
+    },
+    // SEO — H1 (texto para leitores de tela/crawlers) e bloco "Sobre / FAQ"
+    'seo.h1': {
+      pt: ' — Jogue Sinuca 8-Ball 3D Multiplayer Online Grátis, direto no navegador, sem instalar e sem cadastro',
+      en: ' — Play Free Online 3D 8-Ball Pool Multiplayer, right in your browser, no install and no sign-up',
+      es: ' — Juega al Billar 8-Ball 3D Multijugador Online Gratis, en el navegador, sin instalar y sin registro',
+      fr: ' — Jouez au Billard 8-Ball 3D Multijoueur en Ligne Gratuit, dans le navigateur, sans installation ni inscription',
+    },
+    'about.toggle': { pt: 'ℹ Sobre o jogo & FAQ', en: 'ℹ About the game & FAQ', es: 'ℹ Sobre el juego y FAQ', fr: 'ℹ À propos du jeu & FAQ' },
+    'about.h2': {
+      pt: 'OrbitPool — sinuca 8-Ball 3D online e grátis',
+      en: 'OrbitPool — free online 3D 8-Ball pool',
+      es: 'OrbitPool — billar 8-Ball 3D online y gratis',
+      fr: 'OrbitPool — billard 8-Ball 3D en ligne et gratuit',
+    },
+    'about.p1': {
+      pt: 'O OrbitPool é um jogo de sinuca (bilhar 8-Ball) em 3D para jogar online, de graça e direto no navegador — sem baixar nada, sem instalar e sem cadastro. Crie uma sala, envie o código para um amigo e joguem uma partida de pool multiplayer em tempo real por conexão P2P. Funciona no computador e no celular (mouse ou toque).',
+      en: 'OrbitPool is a 3D 8-Ball pool game you play online, for free and right in your browser — no download, no install and no sign-up. Create a room, send the code to a friend and play a real-time multiplayer pool match over a P2P connection. Works on desktop and mobile (mouse or touch).',
+      es: 'OrbitPool es un juego de billar (8-Ball) en 3D para jugar online, gratis y directo en el navegador — sin descargar nada, sin instalar y sin registro. Crea una sala, envía el código a un amigo y jueguen una partida de billar multijugador en tiempo real por conexión P2P. Funciona en el ordenador y en el móvil (ratón o táctil).',
+      fr: 'OrbitPool est un jeu de billard (8-Ball) en 3D à jouer en ligne, gratuitement et directement dans le navigateur — sans téléchargement, sans installation et sans inscription. Créez une salle, envoyez le code à un ami et jouez une partie de billard multijoueur en temps réel via une connexion P2P. Fonctionne sur ordinateur et mobile (souris ou tactile).',
+    },
+    'about.h3play': {
+      pt: 'Como jogar sinuca online no OrbitPool',
+      en: 'How to play pool online on OrbitPool',
+      es: 'Cómo jugar al billar online en OrbitPool',
+      fr: 'Comment jouer au billard en ligne sur OrbitPool',
+    },
+    'about.pplay': {
+      pt: 'Mire com o mouse, segure CTRL e puxe para trás para carregar a força, e solte para dar a tacada. Use SHIFT para aplicar efeito (inglês, follow e draw), TAB para ver a mesa de cima e o scroll para dar zoom. Você também pode jogar contra o bot (treino) ou em duplas com os amigos.',
+      en: 'Aim with the mouse, hold CTRL and pull back to charge power, then release to take the shot. Use SHIFT to apply spin (english, follow and draw), TAB for the top view and scroll to zoom. You can also play against the bot (practice) or in teams with friends.',
+      es: 'Apunta con el ratón, mantén CTRL y tira hacia atrás para cargar la fuerza, y suelta para dar el golpe. Usa SHIFT para aplicar efecto (inglés, follow y draw), TAB para ver la mesa desde arriba y el scroll para acercar. También puedes jugar contra el bot (práctica) o en parejas con amigos.',
+      fr: 'Visez avec la souris, maintenez CTRL et tirez vers l’arrière pour charger la puissance, puis relâchez pour tirer. Utilisez SHIFT pour appliquer l’effet (rétro, coulé et rappel), TAB pour la vue de dessus et la molette pour zoomer. Vous pouvez aussi jouer contre le bot (entraînement) ou en équipes avec des amis.',
+    },
+    'about.h3rules': {
+      pt: 'Regras do 8-Ball', en: '8-Ball rules', es: 'Reglas del 8-Ball', fr: 'Règles du 8-Ball',
+    },
+    'about.prules': {
+      pt: 'A mesa começa aberta. Quem encaçapa a primeira bola numerada define seu grupo: lisas (1–7) ou listradas (9–15). Acertou uma bola do seu grupo, continua jogando; errou, passa a vez. Faltas (branca na caçapa, não tocar em bola ou acertar a bola errada primeiro) dão bola na mão ao adversário. Você vence ao encaçapar a bola 8 depois de limpar todo o seu grupo.',
+      en: 'The table starts open. Whoever pots the first numbered ball claims their group: solids (1–7) or stripes (9–15). Pot a ball from your group and you keep shooting; miss and it is the opponent’s turn. Fouls (potting the cue ball, hitting no ball, or hitting the wrong ball first) give the opponent ball in hand. You win by potting the 8-ball after clearing your whole group.',
+      es: 'La mesa empieza abierta. Quien mete la primera bola numerada define su grupo: lisas (1–7) o rayadas (9–15). Si metes una bola de tu grupo sigues jugando; si fallas, pasa el turno. Las faltas (meter la blanca, no tocar bola o golpear primero la bola equivocada) dan bola en mano al rival. Ganas metiendo la bola 8 tras limpiar todo tu grupo.',
+      fr: 'La table commence ouverte. Celui qui empoche la première bille numérotée choisit son groupe : pleines (1–7) ou rayées (9–15). Empochez une bille de votre groupe et vous rejouez ; ratez et c’est au tour de l’adversaire. Les fautes (bille blanche empochée, aucune bille touchée ou mauvaise bille touchée en premier) donnent bille en main à l’adversaire. Vous gagnez en empochant la bille 8 après avoir nettoyé tout votre groupe.',
+    },
+    'about.h3faq': {
+      pt: 'Perguntas frequentes', en: 'Frequently asked questions', es: 'Preguntas frecuentes', fr: 'Questions fréquentes',
+    },
+    'about.q1': { pt: 'O OrbitPool é gratuito?', en: 'Is OrbitPool free?', es: '¿OrbitPool es gratis?', fr: 'OrbitPool est-il gratuit ?' },
+    'about.a1': {
+      pt: 'Sim, é 100% grátis e sem cadastro. Basta abrir no navegador e jogar.',
+      en: 'Yes, it is 100% free with no sign-up. Just open it in your browser and play.',
+      es: 'Sí, es 100% gratis y sin registro. Solo ábrelo en el navegador y juega.',
+      fr: 'Oui, c’est 100% gratuit et sans inscription. Ouvrez-le simplement dans le navigateur et jouez.',
+    },
+    'about.q2': { pt: 'Preciso instalar alguma coisa?', en: 'Do I need to install anything?', es: '¿Necesito instalar algo?', fr: 'Dois-je installer quelque chose ?' },
+    'about.a2': {
+      pt: 'Não. O jogo roda direto no navegador (com WebGL) no PC ou no celular. Também dá para instalar como app (PWA), se quiser.',
+      en: 'No. The game runs right in the browser (with WebGL) on PC or mobile. You can also install it as an app (PWA) if you like.',
+      es: 'No. El juego funciona directo en el navegador (con WebGL) en PC o móvil. También puedes instalarlo como app (PWA) si quieres.',
+      fr: 'Non. Le jeu tourne directement dans le navigateur (avec WebGL) sur PC ou mobile. Vous pouvez aussi l’installer comme application (PWA) si vous le souhaitez.',
+    },
+    'about.q3': { pt: 'Como jogo com um amigo?', en: 'How do I play with a friend?', es: '¿Cómo juego con un amigo?', fr: 'Comment jouer avec un ami ?' },
+    'about.a3': {
+      pt: 'Crie uma sala, copie o código e mande para o seu amigo. Quando ele entrar com o mesmo código, a partida multiplayer começa em tempo real.',
+      en: 'Create a room, copy the code and send it to your friend. When they join with the same code, the real-time multiplayer match begins.',
+      es: 'Crea una sala, copia el código y envíalo a tu amigo. Cuando entre con el mismo código, la partida multijugador comienza en tiempo real.',
+      fr: 'Créez une salle, copiez le code et envoyez-le à votre ami. Dès qu’il rejoint avec le même code, la partie multijoueur en temps réel commence.',
+    },
+    'about.q4': { pt: 'Dá para jogar sozinho?', en: 'Can I play solo?', es: '¿Puedo jugar solo?', fr: 'Puis-je jouer en solo ?' },
+    'about.a4': {
+      pt: 'Sim. Há um modo de treino contra o bot, com opção de linha guia para praticar as tacadas.',
+      en: 'Yes. There is a practice mode against the bot, with an optional guide line to practice your shots.',
+      es: 'Sí. Hay un modo de práctica contra el bot, con línea guía opcional para practicar los golpes.',
+      fr: 'Oui. Il y a un mode entraînement contre le bot, avec une ligne de visée optionnelle pour travailler vos tirs.',
+    },
+    'about.q5': { pt: 'Funciona no celular?', en: 'Does it work on mobile?', es: '¿Funciona en el móvil?', fr: 'Ça marche sur mobile ?' },
+    'about.a5': {
+      pt: 'Funciona. Os controles por toque aparecem automaticamente em telas de celular e tablet.',
+      en: 'It does. Touch controls appear automatically on phone and tablet screens.',
+      es: 'Sí. Los controles táctiles aparecen automáticamente en pantallas de móvil y tablet.',
+      fr: 'Oui. Les commandes tactiles apparaissent automatiquement sur les écrans de téléphone et tablette.',
+    },
     // ===== Lobby (letreiro + quadro) =====
     'lobby.badge': { en: '🍺 up for a game of pool?', pt: '🍺 bora jogar uma sinuca?', es: '🍺 ¿echamos una partida de billar?', fr: '🍺 on se fait un billard ?' },
     'lobby.tagline': { en: '~ dive bar pool ~', pt: '~ sinuca de boteco ~', es: '~ billar de cantina ~', fr: '~ billard de bistrot ~' },
@@ -275,6 +369,10 @@ window.OrbitI18N = (function () {
   // ---- Detecção: localStorage → idioma do sistema → inglês -----------------
   function detect() {
     try {
+      const p = new URLSearchParams(location.search).get('lang');
+      if (SUPPORTED.includes(p)) return p; // ?lang= tem prioridade (variantes hreflang)
+    } catch (e) {}
+    try {
       const saved = localStorage.getItem(LSKEY);
       if (SUPPORTED.includes(saved)) return saved;
     } catch (e) {}
@@ -294,6 +392,37 @@ window.OrbitI18N = (function () {
     return s;
   }
 
+  // Atualiza <head> (título, descrição, canonical, Open Graph) p/ o idioma atual.
+  function setAttr(sel, attr, val) {
+    const el = document.head && document.head.querySelector(sel);
+    if (el) el.setAttribute(attr, val);
+  }
+  function updateHead() {
+    const canon = CANON_BASE + '?lang=' + lang;
+    const title = t('meta.title'), desc = t('meta.desc');
+    document.title = title;
+    setAttr('meta[name="description"]', 'content', desc);
+    setAttr('link[rel="canonical"]', 'href', canon);
+    setAttr('meta[property="og:url"]', 'content', canon);
+    setAttr('meta[property="og:title"]', 'content', title);
+    setAttr('meta[property="og:description"]', 'content', desc);
+    setAttr('meta[property="og:locale"]', 'content', OGLOCALE[lang]);
+    setAttr('meta[name="twitter:title"]', 'content', title);
+    setAttr('meta[name="twitter:description"]', 'content', desc);
+  }
+
+  // Mantém o ?lang= da URL em sincronia com o idioma (auto-canonicaliza a variante).
+  function syncUrl() {
+    try {
+      const cur = new URLSearchParams(location.search).get('lang');
+      if (cur !== lang && history.replaceState) {
+        const u = new URL(location.href);
+        u.searchParams.set('lang', lang);
+        history.replaceState(null, '', u.pathname + u.search + u.hash);
+      }
+    } catch (e) {}
+  }
+
   // Traduz os elementos estáticos marcados com data-i18n* (idempotente).
   function apply(root) {
     root = root || document;
@@ -302,6 +431,8 @@ window.OrbitI18N = (function () {
     root.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
     root.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
     document.documentElement.setAttribute('lang', lang === 'pt' ? 'pt-BR' : lang);
+    updateHead();
+    syncUrl();
     // Sincroniza os seletores de idioma existentes.
     document.querySelectorAll('select.i18n-lang').forEach((sel) => { if (sel.value !== lang) sel.value = lang; });
   }
