@@ -1,16 +1,15 @@
 node_modules/
-
 # Modelos 3D pesados de origem (NÃO precisam em produção — o jogo usa os
 # arquivos já otimizados em public/). Evita repositório gigante e deploy lento.
 docs/Billiard table Samurai N230421/
 assets/
-
 # temporários
 *.log
 .DS_Store
 dist/
-
 # ranked (Worker Cloudflare)
 ranked/node_modules/
 ranked/.wrangler/
 ranked/src/engine.mjs
+dist-cg/
+orbitpool-cg.zip

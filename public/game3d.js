@@ -738,6 +738,8 @@ function applyStart(msg) {
 // conexão (OrbitNet.leave), esconde o lobby da sala e destrava os botões.
 function abandonRoom(msgText) {
   try { if (OrbitNet.leave) OrbitNet.leave(); } catch (e) {}
+  if (window.OrbitAds) OrbitAds.gameplayStop(); // portal: voltou ao menu
+  if (window.OrbitPortalGame) OrbitPortalGame.hideInvite();
   myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true; roomSeries = true;
   const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
   const rs = document.getElementById('roomShare'); if (rs) rs.hidden = true;
@@ -828,6 +830,7 @@ function renderTeamLobby() {
     ? T('tl.waiting', { n: lobbyRoster.length, code: roomInput }).replace('/4', '/' + roomSlots)
     : (!balanced ? T('tl.balance')
       : (iAmHost ? T('tl.ready') : T('tl.waitHost')));
+  if (window.OrbitPortalGame && roomInput) OrbitPortalGame.showInvite(roomInput); // convite do portal
 }
 
 // Host: sorteia as duplas (2x2 aleatório).
@@ -1322,11 +1325,14 @@ function startGame() {
   }
   if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   for (const b of balls) { const m = ballMeshes[b.n]; if (m) { m.quaternion.set(0, 0, 0, 1); m.position.set(b.x - W / 2, R, b.y - H / 2); m.visible = true; } }
+  if (window.OrbitAds) OrbitAds.gameplayStart(); // portal: sessão de jogo começou
+  if (window.OrbitPortalGame) OrbitPortalGame.hideInvite(); // partida começou
   updateHUD();
   maybeBotTurn();
 }
 function showEnd() {
   exitLock(); // libera o cursor na hora (pra clicar no overlay de fim de jogo)
+  if (window.OrbitAds) { OrbitAds.gameplayStop(); OrbitAds.midgame(); } // portal: intersticial entre partidas
   // Conta a vitória na série (determinístico → todos os lados incrementam igual).
   // Partida ÚNICA (bot/ranqueado/sala com série desligada): sem placar de série.
   if (seriesOn()) {
@@ -1583,6 +1589,28 @@ function init() {
   buildTable(); buildBalls(); buildAimHelpers();
   loadEnvironment(); // fundo 360° do bar (se houver arquivo em env/)
   camPos.set(0, 780, 900); camLook.set(0, 0, 0);
+  if (window.OrbitAds) OrbitAds.ready(); // portal: fim do loading (loadingStop)
+  // Portal: entrou por link de convite → auto-join; instant multiplayer →
+  // cria a sala 1v1 direto (o líder da party compartilha pelo botão do site).
+  if (window.OrbitPortalGame) (async () => {
+    const nickEl = document.getElementById('name');
+    const ensureNick = () => {
+      const acct = window.OrbitAuth && OrbitAuth.user();
+      if (acct && acct.displayName) return true; // conta CG dá o nome
+      if ((nickEl.value || '').trim()) return true;
+      nickEl.value = 'Player' + Math.floor(100 + Math.random() * 900);
+      return true;
+    };
+    const invited = await OrbitPortalGame.inviteParam('room');
+    if (invited) {
+      ensureNick();
+      document.getElementById('joinCode').value = String(invited).toUpperCase().slice(0, 8);
+      document.getElementById('joinBtn').click();
+    } else if (await OrbitPortalGame.instant()) {
+      ensureNick();
+      document.getElementById('createBtn').click(); // sala 1v1 + botão de convite
+    }
+  })();
   resize(); window.addEventListener('resize', resize);
 
   canvas.addEventListener('mousedown', onMouseDown);
@@ -1654,7 +1682,7 @@ function init() {
     // painel ranqueado: cadeado p/ deslogado, fila p/ logado
     document.getElementById('rkLockBox').style.display = logged ? 'none' : '';
     document.getElementById('rkLoginBtn').classList.toggle('hidden', logged);
-    document.getElementById('rkGuestBtn').classList.toggle('hidden', logged);
+    document.getElementById('rkGuestBtn').classList.toggle('hidden', logged || !!window.OrbitPortal);
     document.getElementById('rankedBtn').classList.toggle('hidden', !logged);
     document.getElementById('rkStats').classList.toggle('hidden', !logged);
     if (!logged) return;
@@ -1693,7 +1721,10 @@ function init() {
     document.getElementById('authPass').setAttribute('autocomplete', m === 'signup' ? 'new-password' : 'current-password');
     authErrEl.textContent = '';
   };
-  const openAuth = () => { setAuthMode('signin'); authModalEl.classList.remove('hidden'); document.getElementById('authEmail').focus(); };
+  const openAuth = () => {
+    if (window.OrbitPortal && OrbitAuth.showAuthPrompt) { OrbitAuth.showAuthPrompt(); return; } // portal: prompt nativo
+    setAuthMode('signin'); authModalEl.classList.remove('hidden'); document.getElementById('authEmail').focus();
+  };
   const closeAuth = () => authModalEl.classList.add('hidden');
   document.getElementById('authClose').addEventListener('click', closeAuth);
   authModalEl.addEventListener('click', (e) => { if (e.target === authModalEl) closeAuth(); });

@@ -16,7 +16,9 @@ export { MatchQueue } from './queue.mjs';
 function cors(env, req) {
   const origin = req.headers.get('Origin') || '';
   const allowed = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean);
-  const ok = allowed.includes(origin) || allowed.includes('*');
+  // entradas "https://*.dominio.com" casam qualquer subdomínio (portais)
+  const ok = allowed.includes('*') || allowed.some((a) => a === origin ||
+    (a.startsWith('https://*.') && origin.startsWith('https://') && origin.endsWith(a.slice('https://*'.length))));
   return {
     'Access-Control-Allow-Origin': ok ? origin : (allowed[0] || ''),
     'Access-Control-Allow-Methods': 'GET, OPTIONS',

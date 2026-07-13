@@ -1,0 +1,119 @@
+- generic [active] [ref=f2e1]:
+  - generic:
+    - generic: OrbitPool
+    - generic:
+      - generic:
+        - generic:
+          - generic: A
+          - generic:
+            - generic: Player
+            - generic: open table
+      - generic:
+        - generic: MELHOR DE 5
+        - generic:
+          - generic: "0"
+          - generic: x
+          - generic: "0"
+      - generic:
+        - generic:
+          - generic: V
+          - generic:
+            - generic:
+              - generic: You
+              - generic: YOU
+            - generic: open table
+    - button "📋 CONTROLS H" [ref=f2e4] [cursor=pointer]:
+      - generic [ref=f2e5]: 📋
+      - generic [ref=f2e6]: CONTROLS
+      - generic [ref=f2e7]: H
+    - generic:
+      - generic:
+        - generic: 🎱
+        - generic: Connecting…
+  - generic [ref=f2e9]:
+    - generic [ref=f2e10]:
+      - generic [ref=f2e11]: 🍺 up for a game of pool?
+      - generic [ref=f2e12]:
+        - heading "OrbitPool — Play Free Online 3D 8-Ball Pool Multiplayer, right in your browser, no install and no sign-up" [level=1] [ref=f2e13]:
+          - text: OrbitPool
+          - generic [ref=f2e14]: — Play Free Online 3D 8-Ball Pool Multiplayer, right in your browser, no install and no sign-up
+        - generic [ref=f2e15]: ~ dive bar pool ~
+      - paragraph [ref=f2e61]: Good old 8-ball to play with your crew. Set up a table, send the code to the group chat and go — no sign-up, no fuss.
+      - generic [ref=f2e62]:
+        - generic [ref=f2e63]: dirty glass
+        - generic [ref=f2e68]:
+          - generic [ref=f2e69]: "how to play:"
+          - generic [ref=f2e70]:
+            - generic [ref=f2e71]:
+              - generic [ref=f2e72]: MOUSE
+              - generic [ref=f2e73]: aim · ↑↓ camera
+            - generic [ref=f2e74]:
+              - generic [ref=f2e75]: CTRL
+              - generic [ref=f2e76]: hold & pull = power
+            - generic [ref=f2e77]:
+              - generic [ref=f2e78]: SHIFT
+              - generic [ref=f2e79]: adjust spin
+            - generic [ref=f2e80]:
+              - generic [ref=f2e81]: TAB
+              - generic [ref=f2e82]: top view
+            - generic [ref=f2e83]:
+              - generic [ref=f2e84]: SCROLL
+              - generic [ref=f2e85]: zoom in
+            - generic [ref=f2e86]:
+              - generic [ref=f2e87]: ESC
+              - generic [ref=f2e88]: pause / quit
+    - generic [ref=f2e16]:
+      - generic [ref=f2e17]:
+        - heading "Today's Menu" [level=2] [ref=f2e18]
+        - paragraph [ref=f2e19]: — pool night tonight —
+        - generic [ref=f2e21]:
+          - generic [ref=f2e22]: 👤
+          - generic [ref=f2e23]:
+            - generic [ref=f2e24]: Playing as guest
+            - generic [ref=f2e25]: sign in to save your ELO & stats
+          - button "Sign in" [ref=f2e26] [cursor=pointer]
+        - generic [ref=f2e27]:
+          - generic [ref=f2e28]: your nickname
+          - textbox "your nickname" [ref=f2e29]:
+            - /placeholder: e.g. Eightball Eddie
+            - text: Ace
+        - generic [ref=f2e30]:
+          - button "🎱 Play" [ref=f2e31] [cursor=pointer]
+          - button "🏆 Ranked" [ref=f2e32] [cursor=pointer]
+          - button "🤖 Practice" [ref=f2e33] [cursor=pointer]
+        - generic [ref=f2e95]:
+          - generic [ref=f2e96]:
+            - generic [ref=f2e97]: 🔒
+            - generic [ref=f2e98]:
+              - generic [ref=f2e99]: you need to sign in
+              - generic [ref=f2e100]: ranked is ELO-rated — sign in or play as a guest.
+          - button "🔑 Sign in to play ranked" [ref=f2e101] [cursor=pointer]
+          - button "🎭 Play ranked as guest" [ref=f2e102] [cursor=pointer]
+          - button "📋 View season leaderboard" [ref=f2e103] [cursor=pointer]
+        - paragraph [ref=f2e47]
+        - paragraph [ref=f2e89]:
+          - text: 🤝
+          - generic [ref=f2e90]: Direct connection between you. No server, no account — just show up and play. To test solo, open two tabs.
+        - paragraph [ref=f2e91]:
+          - text: 🖼
+          - generic [ref=f2e92]:
+            - text: "3D table: “Billiard Table” by"
+            - link "Futurealiti" [ref=f2e93] [cursor=pointer]:
+              - /url: https://sketchfab.com/futurealiti
+            - text: (
+            - link "CC-BY-4.0" [ref=f2e94] [cursor=pointer]:
+              - /url: https://creativecommons.org/licenses/by/4.0/
+            - text: ).
+      - generic:
+        - generic:
+          - group [ref=f2e50]:
+            - generic "ℹ About the game & FAQ" [ref=f2e51] [cursor=pointer]
+          - button "🌐 English ▾" [ref=f2e54] [cursor=pointer]:
+            - generic [ref=f2e55]: 🌐
+            - generic [ref=f2e56]: English
+            - generic [ref=f2e57]: ▾
+  - generic [ref=f2e105]:
+    - heading "📋 Leaderboard" [level=2] [ref=f2e106]
+    - paragraph [ref=f2e107]: Season 2026-07
+    - generic [ref=f2e108]: Nobody ranked yet — be the first!
+    - button "Close" [ref=f2e110] [cursor=pointer]
