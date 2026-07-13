@@ -27,7 +27,7 @@ database_id = "678ff534-aaea-4217-b577-fb57a0c3891d"
 
 [vars]
 # Origens permitidas (CORS) — inclua localhost só enquanto testa.
-ALLOWED_ORIGINS = "https://orbitpool.com.br,http://localhost:3000"
+ALLOWED_ORIGINS = "https://orbitpool.com.br,http://localhost:3000,https://*.crazygames.com,https://crazygames.com"
 FIREBASE_PROJECT_ID = "orbitpool-49e20"
 # NUNCA "true" em produção — usado apenas pelos testes locais.
 ALLOW_DEV_AUTH = "false"

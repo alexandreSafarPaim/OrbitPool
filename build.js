@@ -27,12 +27,14 @@ const { minify: htmlMinify } = require('html-minifier-terser');
 const JavaScriptObfuscator = require('javascript-obfuscator');
 
 const SRC = path.join(__dirname, 'public');
-const OUT = path.join(__dirname, 'dist');
+// --cg: build para o PORTAL (CrazyGames) → dist-cg/ com SDK, sem PWA/links
+const CG = process.argv.includes('--cg');
+const OUT = path.join(__dirname, CG ? 'dist-cg' : 'dist');
 
 // JS com lógica própria do jogo → minify + obfuscação leve
-const OBFUSCATE = ['rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'auth.js', 'audio.js', 'menu.js'];
+const OBFUSCATE = ['rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', CG ? 'portal.js' : 'auth.js', 'audio.js', 'menu.js'];
 // Libs de terceiros / traduções / SW → só minify
-const MINIFY_ONLY = ['GLTFLoader.js', 'OBJLoader.js', 'i18n.js', 'table3d_collider.js', 'sw.js'];
+const MINIFY_ONLY = ['GLTFLoader.js', 'OBJLoader.js', 'i18n.js', 'table3d_collider.js', ...(CG ? [] : ['sw.js'])];
 
 const TERSER_OPTS = {
   compress: {
@@ -90,6 +92,14 @@ async function main() {
 
   // 1) copia tudo (assets); JS/HTML serão sobrescritos pelas versões buildadas
   copyTree(SRC, OUT);
+  if (CG) { // portal: sem música (direitos), sem PWA, sem o auth do site
+    for (const f of ['sw.js', 'site.webmanifest', 'auth.js', 'robots.txt', 'sitemap.xml']) {
+      try { fs.rmSync(path.join(OUT, f)); } catch (e) {}
+    }
+    try { fs.rmSync(path.join(OUT, 'music'), { recursive: true }); } catch (e) {}
+  } else {
+    try { fs.rmSync(path.join(OUT, 'portal.js')); } catch (e) {} // portal.js não vai pro site
+  }
 
   // 2) JS
   const report = [];
@@ -102,7 +112,19 @@ async function main() {
   }
 
   // 3) index.html (CSS e JS inline minificados junto)
-  const htmlSrc = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
+  let htmlSrc = fs.readFileSync(path.join(SRC, 'index.html'), 'utf8');
+  if (CG) {
+    // SDK do CrazyGames no <head> (exigência: carregar cedo)
+    htmlSrc = htmlSrc.replace('</title>', '</title>\n  <script src="https://sdk.crazygames.com/crazygames-sdk-v3.js"></script>');
+    // auth.js → portal.js na cadeia de carregamento
+    htmlSrc = htmlSrc.replace("loadScript('auth.js'", "loadScript('portal.js'")
+      .replace("{ file: 'auth.js' }", "{ file: 'portal.js' }");
+    // sem service worker/PWA no portal
+    htmlSrc = htmlSrc.replace("if ('serviceWorker' in navigator)", "if (false)");
+    htmlSrc = htmlSrc.replace(/^.*rel="manifest".*$\n?/m, '');
+    // sem links externos (regra do portal) — o texto de crédito CC-BY permanece
+    htmlSrc = htmlSrc.replace(/<a href="https?:\/\/[^"]*"[^>]*>(.*?)<\/a>/g, '$1');
+  }
   const html = await htmlMinify(htmlSrc, {
     collapseWhitespace: true,
     removeComments: true,
@@ -114,6 +136,7 @@ async function main() {
   report.push(['index.html', Buffer.byteLength(htmlSrc), Buffer.byteLength(html)]);
 
   // 4) sw.js: VERSION = hash do shell buildado (cache busting automático)
+  if (!CG) {
   const swPath = path.join(OUT, 'sw.js');
   let sw = fs.readFileSync(swPath, 'utf8');
   const shellFiles = ['index.html', 'rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'auth.js',
@@ -125,9 +148,10 @@ async function main() {
   if (swOut === sw) console.warn('  (aviso) não achei a VERSION no sw.js — cache pode não atualizar');
   fs.writeFileSync(swPath, swOut);
   console.log('  service worker →', version);
+  }
 
-  // 5) _headers (Cloudflare Pages) — security headers + CSP
-  fs.writeFileSync(path.join(OUT, '_headers'), `/*
+  // 5) _headers (Cloudflare Pages) — security headers + CSP (não vale p/ portal)
+  if (!CG) fs.writeFileSync(path.join(OUT, '_headers'), `/*
   X-Content-Type-Options: nosniff
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
@@ -146,7 +170,8 @@ async function main() {
   }
   console.log('  ' + 'TOTAL (código)'.padEnd(20) + String((a / 1024).toFixed(1) + 'K').padStart(8)
     + '  → ' + String((b / 1024).toFixed(1) + 'K').padStart(8));
-  console.log(`\n✅ dist/ pronto em ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
+  console.log(`\n✅ ${CG ? 'dist-cg/ (PORTAL)' : 'dist/'} pronto em ${((Date.now() - t0) / 1000).toFixed(1)}s\n`);
+  if (CG) console.log('  → zip p/ upload:  Compress-Archive -Path dist-cg\\* -DestinationPath orbitpool-cg.zip -Force\n');
 }
 
 main().catch((e) => { console.error('❌ build falhou:', e); process.exit(1); });
