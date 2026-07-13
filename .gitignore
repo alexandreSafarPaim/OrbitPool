@@ -15,4 +15,5 @@ ranked/node_modules/
 ranked/.wrangler/
 ranked/src/engine.mjs
 dist-cg/
-orbitpool-c
+orbitpool-cdist-cg/
+orbitpool-cg.zip
