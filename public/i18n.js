@@ -57,6 +57,7 @@ window.OrbitI18N = (function () {
     'auth.err.popup': { pt: 'A janela do Google foi fechada/bloqueada.', en: 'The Google window was closed/blocked.', es: 'La ventana de Google se cerró/bloqueó.', fr: 'La fenêtre Google a été fermée/bloquée.' },
     'auth.err.network': { pt: 'Sem conexão — tenta de novo.', en: 'No connection — try again.', es: 'Sin conexión — inténtalo de nuevo.', fr: 'Pas de connexion — réessayez.' },
     'auth.err.needName': { pt: 'Diz teu nome pra criar a conta.', en: 'Tell us your name to create the account.', es: 'Dinos tu nombre para crear la cuenta.', fr: 'Indiquez votre nom pour créer le compte.' },
+    'auth.err.provider': { pt: 'Método de login desativado no servidor — avise o admin.', en: 'This sign-in method is disabled — contact the admin.', es: 'Este método de acceso está desactivado — avisa al admin.', fr: 'Cette méthode de connexion est désactivée — contactez l’admin.' },
     'auth.err.generic': { pt: 'Não deu — tenta de novo.', en: 'Something failed — try again.', es: 'Algo falló — inténtalo de nuevo.', fr: 'Échec — réessayez.' },
     // ---- Ranqueado / leaderboard --------------------------------------
     'or.ranked': { pt: 'ou joga valendo ranking', en: 'or play ranked', es: 'o juega clasificatoria', fr: 'ou jouez en classé' },

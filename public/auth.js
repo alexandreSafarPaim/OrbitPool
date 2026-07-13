@@ -57,6 +57,7 @@ window.OrbitAuth = (function () {
     if (/too-many-requests/.test(c)) return 'auth.err.tooMany';
     if (/popup-closed|cancelled-popup|popup-blocked/.test(c)) return 'auth.err.popup';
     if (/network-request-failed/.test(c)) return 'auth.err.network';
+    if (/operation-not-allowed/.test(c)) return 'auth.err.provider';
     return 'auth.err.generic';
   }
 
