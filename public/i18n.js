@@ -79,6 +79,7 @@ window.OrbitI18N = (function () {
     'rk.eloDelta': { pt: 'ELO {delta}.', en: 'ELO {delta}.', es: 'ELO {delta}.', fr: 'ELO {delta}.' },
     'rk.again': { pt: '🏆 Buscar outra partida', en: '🏆 Find another match', es: '🏆 Buscar otra partida', fr: '🏆 Chercher une autre partie' },
     'lb.title': { pt: 'Temporada {season}', en: 'Season {season}', es: 'Temporada {season}', fr: 'Saison {season}' },
+    'hint.p2pShort': { pt: 'Conexão direta no jogo casual — é só chegar e jogar.', en: 'Casual games are peer-to-peer — just show up and play.', es: 'El juego casual es conexión directa — llega y juega.', fr: 'Le jeu casual est en connexion directe — venez et jouez.' },
     'lb.close': { pt: 'Fechar', en: 'Close', es: 'Cerrar', fr: 'Fermer' },
     'lb.wl': { pt: '{w}V · {l}D', en: '{w}W · {l}L', es: '{w}V · {l}D', fr: '{w}V · {l}D' },
     'lb.empty': { pt: 'Ninguém no ranking ainda — seja o primeiro!', en: 'Nobody ranked yet — be the first!', es: 'Nadie en el ranking todavía — ¡sé el primero!', fr: 'Personne au classement — soyez le premier !' },
