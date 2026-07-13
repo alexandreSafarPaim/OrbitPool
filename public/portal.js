@@ -64,7 +64,9 @@ window.OrbitPortal = 'crazygames';
   // ---- OrbitAds: eventos + intersticial --------------------------------
   let lastAd = 0, inAd = false;
   const AD_COOLDOWN = 150000; // 2,5 min entre intersticiais (além do controle do SDK)
-  const canSDK = () => { const s = SDK(); return s && (s.environment === 'crazygames' || s.environment === 'local'); };
+  // 'disabled' = embed fora do CrazyGames; em qualquer outro ambiente
+  // (crazygames, local, QA Tool) o SDK decide — nós só tentamos.
+  const canSDK = () => { const s = SDK(); return s && s.environment !== 'disabled'; };
 
   window.OrbitAds = {
     ready() { load().then(() => { try { SDK().game.loadingStop(); } catch (e) {} }).catch(() => {}); },
@@ -82,9 +84,9 @@ window.OrbitPortal = 'crazygames';
         SDK().ad.requestAd('midgame', {
           adStarted: () => { if (window.OrbitAudio && !wasMuted) OrbitAudio.setMuted(true); },
           adFinished: done,
-          adError: done,
+          adError: (e) => { console.warn('OrbitPool: midgame adError —', e && (e.code || e.message || e)); done(); },
         });
-      } catch (e) { done(); }
+      } catch (e) { console.warn('OrbitPool: requestAd falhou —', e && e.message); done(); }
     },
   };
 

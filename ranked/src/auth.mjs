@@ -22,9 +22,32 @@ const CACHE_MS = 6 * 3600 * 1000;
 async function importJwk(jwk) {
   return crypto.subtle.importKey('jwk', jwk, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
 }
+// DER helpers: converte chave PKCS#1 ("BEGIN RSA PUBLIC KEY", usada pelo
+// CrazyGames) para SPKI, que é o único formato que o WebCrypto importa.
+function derLen(n) {
+  if (n < 0x80) return Uint8Array.of(n);
+  const b = []; while (n > 0) { b.unshift(n & 0xff); n >>= 8; }
+  return Uint8Array.from([0x80 | b.length, ...b]);
+}
+function derWrap(tag, body) {
+  const l = derLen(body.length);
+  const out = new Uint8Array(1 + l.length + body.length);
+  out[0] = tag; out.set(l, 1); out.set(body, 1 + l.length);
+  return out;
+}
+function pkcs1ToSpki(pkcs1) {
+  // AlgorithmIdentifier { rsaEncryption (1.2.840.113549.1.1.1), NULL }
+  const algId = Uint8Array.from([0x30, 0x0d, 0x06, 0x09, 0x2a, 0x86, 0x48, 0x86, 0xf7, 0x0d, 0x01, 0x01, 0x01, 0x05, 0x00]);
+  const bits = derWrap(0x03, Uint8Array.from([0x00, ...pkcs1])); // BIT STRING (0 bits sobrando)
+  const seq = new Uint8Array(algId.length + bits.length);
+  seq.set(algId, 0); seq.set(bits, algId.length);
+  return derWrap(0x30, seq);
+}
 async function importSpkiPem(pem) {
-  const der = b64uToBytes(pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')
+  const isPkcs1 = /BEGIN RSA PUBLIC KEY/.test(pem);
+  let der = b64uToBytes(pem.replace(/-----[^-]+-----/g, '').replace(/\s+/g, '')
     .replace(/\+/g, '-').replace(/\//g, '_')); // normaliza p/ b64url e decodifica
+  if (isPkcs1) der = pkcs1ToSpki(der);
   return crypto.subtle.importKey('spki', der, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']);
 }
 
