@@ -1095,12 +1095,14 @@
     // sequência. Assim não depende de um CDN específico que o navegador/extensão
     // possa bloquear. Se nada carregar, mostra um erro claro no lobby.
     (function () {
-      var SRCS = [
-        'three.min.js',
+      // three.min.js local: só em dev (em produção o 404 da Pages vira
+      // HTML e polui o console com erro de MIME — vai direto ao CDN).
+      var IS_DEV = /^(localhost|127\.|192\.168\.)/.test(location.hostname);
+      var SRCS = (IS_DEV ? ['three.min.js'] : []).concat([
         'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
         'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
         'https://unpkg.com/three@0.128.0/build/three.min.js'
-      ];
+      ]);
       function fail(msg) {
         var el = document.getElementById('lobbyMsg');
         if (el) el.textContent = msg;
