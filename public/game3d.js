@@ -739,7 +739,7 @@ function applyStart(msg) {
 function abandonRoom(msgText) {
   try { if (OrbitNet.leave) OrbitNet.leave(); } catch (e) {}
   if (window.OrbitAds) OrbitAds.gameplayStop(); // portal: voltou ao menu
-  if (window.OrbitPortalGame) OrbitPortalGame.hideInvite();
+  if (window.OrbitPortalGame) OrbitPortalGame.leftRoom();
   myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true; roomSeries = true;
   const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
   const rs = document.getElementById('roomShare'); if (rs) rs.hidden = true;
@@ -1326,7 +1326,7 @@ function startGame() {
   if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   for (const b of balls) { const m = ballMeshes[b.n]; if (m) { m.quaternion.set(0, 0, 0, 1); m.position.set(b.x - W / 2, R, b.y - H / 2); m.visible = true; } }
   if (window.OrbitAds) OrbitAds.gameplayStart(); // portal: sessão de jogo começou
-  if (window.OrbitPortalGame) OrbitPortalGame.hideInvite(); // partida começou
+  if (window.OrbitPortalGame) OrbitPortalGame.matchStarted(); // sala fecha p/ novos jogadores
   updateHUD();
   maybeBotTurn();
 }
@@ -1341,6 +1341,7 @@ function showEnd() {
   } else matchOver = false;
   const won = game.winner === teamOf(myNo); // vitória do SEU time (1v1: você)
   if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
+  if (won && window.OrbitPortalGame) OrbitPortalGame.happy(); // confete do portal
   endWon = won;
   renderEndTexts();
   document.getElementById('rematchMsg').textContent = '';
@@ -1619,14 +1620,19 @@ function init() {
       nickEl.value = 'Player' + Math.floor(100 + Math.random() * 900);
       return true;
     };
+    const goJoin = (code) => {
+      if (phase !== 'lobby') return; // no meio de uma partida não puxa o jogador
+      ensureNick();
+      document.getElementById('joinCode').value = String(code).toUpperCase().slice(0, 8);
+      document.getElementById('joinBtn').click();
+    };
+    OrbitPortalGame.onJoinRequest(goJoin); // convites recebidos em tempo real
     const invited = await OrbitPortalGame.inviteParam('room');
     if (invited) {
-      ensureNick();
-      document.getElementById('joinCode').value = String(invited).toUpperCase().slice(0, 8);
-      document.getElementById('joinBtn').click();
+      goJoin(invited);
     } else if (await OrbitPortalGame.instant()) {
       ensureNick();
-      document.getElementById('createBtn').click(); // sala 1v1 + botão de convite
+      document.getElementById('createBtn').click(); // sala 1v1 + convite ativo
     }
   })();
   resize(); window.addEventListener('resize', resize);
@@ -1851,7 +1857,10 @@ function init() {
     lockInputs();
     setLobbyMsg(T('lm.connectingRoom', { code: code })); joinRoom();
   });
-  const inviteURL = (code) => location.origin + location.pathname + '?room=' + encodeURIComponent(code);
+  const inviteURL = (code) => {
+    if (window.OrbitPortalGame) { const l = OrbitPortalGame.inviteLink(code); if (l) return l; }
+    return location.origin + location.pathname + '?room=' + encodeURIComponent(code);
+  };
   document.getElementById('copyCodeBtn').addEventListener('click', () => {
     const code = inviteURL(document.getElementById('roomCodeVal').textContent);
     const btn = document.getElementById('copyCodeBtn');

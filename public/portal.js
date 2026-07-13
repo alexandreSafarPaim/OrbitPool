@@ -99,9 +99,11 @@ window.OrbitPortal = 'crazygames';
     },
   };
 
-  // ---- Multiplayer do portal: convite + instant multiplayer -------------
-  // Exigências do CrazyGames p/ jogos multiplayer: botão de convite (footer
-  // do site) com o código da sala, auto-join via link e IsInstantMultiplayer.
+  // ---- Multiplayer do portal (API nova: Room Data) -----------------------
+  // updateRoom/leftRoom alimentam o convite nativo, notificações e "jogar
+  // com amigos" do portal; addJoinRoomListener recebe convites em tempo real
+  // (o jogador pode ser puxado pra sala do amigo mesmo já estando no jogo).
+  let curRoom = null;
   window.OrbitPortalGame = {
     async inviteParam(name) {
       try { await load(); return SDK().game.getInviteParam(name) || null; } catch (e) { return null; }
@@ -109,11 +111,37 @@ window.OrbitPortal = 'crazygames';
     async instant() {
       try { await load(); return !!SDK().game.isInstantMultiplayer; } catch (e) { return false; }
     },
+    // sala aberta no lobby → anunciada como joinable (convite ativo)
     showInvite(code) {
-      load().then(() => { try { SDK().game.showInviteButton({ room: String(code) }); } catch (e) {} }).catch(() => {});
+      curRoom = String(code);
+      load().then(() => {
+        try { SDK().game.updateRoom({ roomId: curRoom, isJoinable: true, inviteParams: { room: curRoom } }); } catch (e) {}
+      }).catch(() => {});
     },
-    hideInvite() {
-      load().then(() => { try { SDK().game.hideInviteButton(); } catch (e) {} }).catch(() => {});
+    // link de convite do portal para o botão "copiar" dentro do jogo
+    inviteLink(code) {
+      try { return SDK().game.inviteLink({ room: String(code) }); } catch (e) { return null; }
+    },
+    // a partida começou: sala segue existindo, mas ninguém mais entra
+    matchStarted() {
+      if (!curRoom) return;
+      load().then(() => { try { SDK().game.updateRoom({ isJoinable: false }); } catch (e) {} }).catch(() => {});
+    },
+    // jogador saiu/abandonou a sala
+    leftRoom() {
+      if (!curRoom) return;
+      curRoom = null;
+      load().then(() => { try { SDK().game.leftRoom(); } catch (e) {} }).catch(() => {});
+    },
+    // celebração do portal (confete) — usar com parcimônia
+    happy() {
+      load().then(() => { try { SDK().game.happytime(); } catch (e) {} }).catch(() => {});
+    },
+    // convite recebido com o jogo JÁ aberto → repassa ao jogo via evento
+    onJoinRequest(cb) {
+      load().then(() => {
+        try { SDK().game.addJoinRoomListener((params) => { if (params && params.room) cb(String(params.room)); }); } catch (e) {}
+      }).catch(() => {});
     },
   };
 
