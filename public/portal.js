@@ -103,7 +103,7 @@ window.OrbitPortal = 'crazygames';
   // updateRoom/leftRoom alimentam o convite nativo, notificações e "jogar
   // com amigos" do portal; addJoinRoomListener recebe convites em tempo real
   // (o jogador pode ser puxado pra sala do amigo mesmo já estando no jogo).
-  let curRoom = null;
+  let curRoom = null, curLink = null;
   window.OrbitPortalGame = {
     async inviteParam(name) {
       try { await load(); return SDK().game.getInviteParam(name) || null; } catch (e) { return null; }
@@ -111,15 +111,19 @@ window.OrbitPortal = 'crazygames';
     async instant() {
       try { await load(); return !!SDK().game.isInstantMultiplayer; } catch (e) { return false; }
     },
-    // sala aberta no lobby → anunciada como joinable (convite ativo)
+    // sala aberta no lobby → anunciada como joinable (convite ativo).
+    // O link de convite é PRÉ-gerado aqui (não depende de clique) — assim o
+    // botão "copiar" responde na hora e o SDK registra o uso de inviteLink.
     showInvite(code) {
       curRoom = String(code);
       load().then(() => {
         try { SDK().game.updateRoom({ roomId: curRoom, isJoinable: true, inviteParams: { room: curRoom } }); } catch (e) {}
+        try { curLink = SDK().game.inviteLink({ room: curRoom }) || null; } catch (e) { curLink = null; }
       }).catch(() => {});
     },
     // link de convite do portal para o botão "copiar" dentro do jogo
     inviteLink(code) {
+      if (curLink && String(code) === curRoom) return curLink;
       try { return SDK().game.inviteLink({ room: String(code) }); } catch (e) { return null; }
     },
     // a partida começou: sala segue existindo, mas ninguém mais entra
