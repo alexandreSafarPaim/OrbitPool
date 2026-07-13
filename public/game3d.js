@@ -1341,7 +1341,9 @@ function showEnd() {
   } else matchOver = false;
   const won = game.winner === teamOf(myNo); // vitória do SEU time (1v1: você)
   if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
-  if (won && window.OrbitPortalGame) OrbitPortalGame.happy(); // confete do portal
+  // Confete do portal SÓ no momento especial: vitória da SÉRIE (melhor de 3)
+  // ou da partida única (bot/ranqueada/sala sem série) — nunca a cada jogo.
+  if (won && (!seriesOn() || matchOver) && window.OrbitPortalGame) OrbitPortalGame.happy();
   endWon = won;
   renderEndTexts();
   document.getElementById('rematchMsg').textContent = '';
