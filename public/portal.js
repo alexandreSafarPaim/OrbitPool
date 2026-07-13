@@ -11,6 +11,15 @@
 
 window.OrbitPortal = 'crazygames';
 
+// A build do portal não inclui as músicas (direitos) — zera o volume da
+// música para o player nem tentar carregar (evita 404 no console do QA).
+(function muteMusicOnPortal() {
+  const t = setInterval(() => {
+    if (window.OrbitAudio) { clearInterval(t); try { OrbitAudio.setVolume('music', 0); } catch (e) {} }
+  }, 100);
+  setTimeout(() => clearInterval(t), 10000);
+})();
+
 (function () {
   const SDK = () => (window.CrazyGames && window.CrazyGames.SDK) || null;
   let ready = null, sdkUser = null;
