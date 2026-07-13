@@ -51,6 +51,12 @@ Para jogar a dois:
 - **`public/game.js`** — renderização, mira, efeito (inglês/follow/draw), regras
   do 8-ball e rede no cliente.
 - **`public/index.html` / `style.css`** — lobby e HUD.
+- **`public/rules.js`** — regras do 8-ball em módulo puro, compartilhado entre
+  o cliente e o servidor ranqueado.
+- **`public/ranked.js` + `ranked/`** — modo RANQUEADO: matchmaking + partida em
+  servidor AUTORITATIVO (Cloudflare Workers/Durable Objects, plano free). O
+  cliente envia só o input da tacada; o servidor roda a mesma física/regras,
+  decide o vencedor e grava o ELO no D1 (temporada mensal). Ver `ranked/README.md`.
 
 ## Notas
 

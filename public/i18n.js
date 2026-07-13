@@ -20,6 +20,24 @@ window.OrbitI18N = (function () {
 
   // ---- Dicionário: chave → { en, pt, es, fr } ------------------------------
   const D = {
+    // ---- Ranqueado / leaderboard --------------------------------------
+    'or.ranked': { pt: 'ou joga valendo ranking', en: 'or play ranked', es: 'o juega clasificatoria', fr: 'ou jouez en classé' },
+    'mode.ranked': { pt: 'Ranqueado', en: 'Ranked', es: 'Clasificatoria', fr: 'Classé' },
+    'mode.rankedSub': { pt: '1v1 online · vale ELO', en: '1v1 online · ELO rated', es: '1v1 online · con ELO', fr: '1v1 en ligne · classé ELO' },
+    'mode.lb': { pt: 'Ranking', en: 'Leaderboard', es: 'Ranking', fr: 'Classement' },
+    'mode.lbSub': { pt: 'top da temporada', en: 'season top players', es: 'top de la temporada', fr: 'top de la saison' },
+    'rk.searching': { pt: 'Procurando adversário… (deixa aberto!)', en: 'Searching for an opponent… (keep this open!)', es: 'Buscando rival… (¡no cierres!)', fr: 'Recherche d’un adversaire… (gardez la page ouverte !)' },
+    'rk.needLogin': { pt: 'O modo ranqueado vai exigir login — em breve!', en: 'Ranked mode will require sign-in — coming soon!', es: 'El modo clasificatorio requerirá iniciar sesión — ¡pronto!', fr: 'Le mode classé nécessitera une connexion — bientôt !' },
+    'rk.connFail': { pt: 'Não deu para falar com o servidor ranqueado. Tenta de novo.', en: 'Could not reach the ranked server. Try again.', es: 'No se pudo conectar al servidor clasificatorio. Inténtalo de nuevo.', fr: 'Impossible de joindre le serveur classé. Réessayez.' },
+    'rk.authFail': { pt: 'Conexão recusada (login inválido ou servidor fora).', en: 'Connection refused (invalid sign-in or server down).', es: 'Conexión rechazada (sesión inválida o servidor caído).', fr: 'Connexion refusée (session invalide ou serveur indisponible).' },
+    'rk.wonWO': { pt: 'O adversário abandonou — vitória por W.O.!', en: 'Your opponent left — you win by forfeit!', es: 'Tu rival abandonó — ¡ganas por abandono!', fr: 'Votre adversaire a quitté — victoire par forfait !' },
+    'rk.lostWO': { pt: 'Tempo esgotado/abandono — derrota por W.O.', en: 'Time out/abandon — you lose by forfeit.', es: 'Tiempo agotado/abandono — pierdes por abandono.', fr: 'Temps écoulé/abandon — défaite par forfait.' },
+    'rk.eloDelta': { pt: 'ELO {delta}.', en: 'ELO {delta}.', es: 'ELO {delta}.', fr: 'ELO {delta}.' },
+    'rk.again': { pt: '🏆 Buscar outra partida', en: '🏆 Find another match', es: '🏆 Buscar otra partida', fr: '🏆 Chercher une autre partie' },
+    'lb.title': { pt: 'Temporada {season}', en: 'Season {season}', es: 'Temporada {season}', fr: 'Saison {season}' },
+    'lb.close': { pt: 'Fechar', en: 'Close', es: 'Cerrar', fr: 'Fermer' },
+    'lb.wl': { pt: '{w}V · {l}D', en: '{w}W · {l}L', es: '{w}V · {l}D', fr: '{w}V · {l}D' },
+    'lb.empty': { pt: 'Ninguém no ranking ainda — seja o primeiro!', en: 'Nobody ranked yet — be the first!', es: 'Nadie en el ranking todavía — ¡sé el primero!', fr: 'Personne au classement — soyez le premier !' },
     // SEO — título e descrição por idioma (aplicados no <head> por updateHead)
     'meta.title': {
       pt: 'OrbitPool — Sinuca 8-Ball 3D Multiplayer Online Grátis',

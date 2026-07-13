@@ -30,7 +30,7 @@ const SRC = path.join(__dirname, 'public');
 const OUT = path.join(__dirname, 'dist');
 
 // JS com lógica própria do jogo → minify + obfuscação leve
-const OBFUSCATE = ['physics.js', 'game3d.js', 'bot.js', 'net.js', 'audio.js', 'menu.js'];
+const OBFUSCATE = ['rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'audio.js', 'menu.js'];
 // Libs de terceiros / traduções / SW → só minify
 const MINIFY_ONLY = ['GLTFLoader.js', 'OBJLoader.js', 'i18n.js', 'table3d_collider.js', 'sw.js'];
 
@@ -116,7 +116,7 @@ async function main() {
   // 4) sw.js: VERSION = hash do shell buildado (cache busting automático)
   const swPath = path.join(OUT, 'sw.js');
   let sw = fs.readFileSync(swPath, 'utf8');
-  const shellFiles = ['index.html', 'physics.js', 'game3d.js', 'bot.js', 'net.js',
+  const shellFiles = ['index.html', 'rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js',
     'audio.js', 'menu.js', 'i18n.js', 'table3d_collider.js', 'GLTFLoader.js', 'OBJLoader.js'];
   const h = crypto.createHash('sha256');
   for (const f of shellFiles) { const p = path.join(OUT, f); if (fs.existsSync(p)) h.update(fs.readFileSync(p)); }

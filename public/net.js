@@ -37,6 +37,44 @@ window.OrbitNet = {
   },
   joinRoom(code, name, onMsg) { this._begin(name, onMsg); this._isHost = false; if (this.mode === 'server') this._wsJoin(code); else this._p2pJoin(code); },
 
+  // ---- RANQUEADO: fila de matchmaking + sala autoritativa (Cloudflare) -----
+  // Fluxo: WS na fila -> {t:'matched', room} -> WS na sala. O servidor manda
+  // 'start' com o rack oficial; tacadas viram 'shotinput' (ver game3d.js).
+  playRanked(token, name, onMsg) {
+    this._begin(name, onMsg); this.mode = 'ranked'; this._isHost = false; this._slots = 2;
+    this._rkToken = token; this._rkRoom = null; this._rkTries = 0;
+    let q;
+    try { q = new WebSocket(OrbitRanked.wsBase() + '/ws/queue?token=' + encodeURIComponent(token)); }
+    catch (e) { return this._onMsg({ t: '_neterror', msg: NET_T('rk.connFail') }); }
+    this._ws = q;
+    q.onmessage = (e) => {
+      let m; try { m = JSON.parse(e.data); } catch (_) { return; }
+      if (m.t === 'matched') { this._rkRoom = m.room; try { q.close(1000, 'pareado'); } catch (_) {} this._rkConnect(); }
+      else this._onMsg(m); // waiting etc.
+    };
+    // 401 (sem login) chega como close/erro antes de qualquer mensagem.
+    q.onerror = () => { if (!this._rkRoom && !this._closing) this._onMsg({ t: '_neterror', msg: NET_T('rk.authFail') }); };
+    q.onclose = () => { if (!this._rkRoom && !this._closing) this._onMsg({ t: '_neterror', msg: NET_T('net.closed') }); };
+  },
+  _rkConnect() {
+    let ws;
+    try { ws = new WebSocket(OrbitRanked.wsBase() + '/ws/room/' + this._rkRoom + '?token=' + encodeURIComponent(this._rkToken)); }
+    catch (e) { return this._onMsg({ t: '_neterror', msg: NET_T('rk.connFail') }); }
+    this._ws = ws;
+    ws.onopen = () => { this._rkTries = 0; };
+    ws.onmessage = (e) => { let m; try { m = JSON.parse(e.data); } catch (_) { return; } this._onMsg(m); };
+    ws.onclose = () => {
+      if (this._closing || this.mode !== 'ranked') return;
+      // O servidor segura a vaga por 60s — tenta voltar (rede móvel oscila).
+      if (this._started && this._rkTries < 5) {
+        this._rkTries++;
+        setTimeout(() => { if (!this._closing && this.mode === 'ranked') this._rkConnect(); }, 1200 * this._rkTries);
+      } else if (!this._started) {
+        this._onMsg({ t: '_neterror', msg: NET_T('net.closed') });
+      }
+    };
+  },
+
   _begin(name, onMsg) {
     this.mode = /[?&]server\b/.test(location.search) ? 'server' : 'p2p';
     this._myName = name || NET_T('hud.player'); this._onMsg = onMsg; this._oppName = '';
@@ -62,12 +100,12 @@ window.OrbitNet = {
     } catch (e) {}
     this._peer = null; this._conn = null; this._ws = null;
     this._guests = []; this._roster = null; this._started = false;
-    this._lost = {}; this._isHost = false;
+    this._lost = {}; this._isHost = false; this._rkRoom = null; this._rkToken = null;
     setTimeout(() => { this._closing = false; }, 300);
   },
 
   send(obj) {
-    if (this.mode === 'server') { if (this._ws && this._ws.readyState === 1) this._ws.send(JSON.stringify(obj)); return; }
+    if (this.mode === 'server' || this.mode === 'ranked') { if (this._ws && this._ws.readyState === 1) this._ws.send(JSON.stringify(obj)); return; }
     if (this._isHost) { // host = hub: repassa a todos os convidados
       for (const g of this._guests) { if (g.open) { try { g.send(obj); } catch (e) {} } }
     } else if (this._conn && this._conn.open) { try { this._conn.send(obj); } catch (e) {} }

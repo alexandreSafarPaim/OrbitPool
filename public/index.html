@@ -108,7 +108,7 @@
         repeating-linear-gradient(90deg, transparent 0 63px, rgba(0,0,0,.22) 63px 65px),
         linear-gradient(135deg, #1b3a2e 0%, #14322a 40%, #10241f 100%); }
     .overlay.hidden { display: none; }
-    #teamLobby, #endOverlay, #gpuModal { background: rgba(6,10,8,.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    #teamLobby, #endOverlay, #gpuModal, #lbModal { background: rgba(6,10,8,.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
     .panel { position: relative; padding: 30px 30px 26px; width: min(92vw, 420px); text-align: center;
       border-radius: 14px; border: 9px solid transparent;
       background:
@@ -263,6 +263,15 @@
       border: none; box-shadow: 0 4px 0 #a86a10, 0 8px 16px rgba(0,0,0,.35); }
     .botLvl.mine:hover { transform: translateY(2px); box-shadow: 0 2px 0 #a86a10, 0 6px 12px rgba(0,0,0,.35); }
     #lobbyMsg { color: var(--accent); font-size: 14px; min-height: 18px; margin: 14px 0 0; text-align: center; }
+    .lbList { margin: 12px 0 16px; max-height: 46vh; overflow-y: auto; text-align: left;
+      border: 1px dashed rgba(255,255,255,.22); border-radius: 10px; padding: 8px 14px;
+      font-family: system-ui, -apple-system, 'Segoe UI', sans-serif; }
+    .lbList .lbRow { display: flex; align-items: baseline; gap: 10px; font-size: 14px; line-height: 2; }
+    .lbList .lbRow .pos { color: var(--accent); min-width: 2.2ch; font-family: 'Permanent Marker', cursive; }
+    .lbList .lbRow .nm { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lbList .lbRow .elo { font-weight: 700; color: var(--accent); }
+    .lbList .lbRow .wl { font-size: 12px; opacity: .75; min-width: 8ch; text-align: right; }
+    .lbList .lbEmpty { opacity: .8; font-size: 13.5px; line-height: 1.6; padding: 6px 0; }
     .cardHint { display: flex; gap: 8px; align-items: flex-start; margin: 14px 0 0; padding-top: 12px;
       border-top: 1px dashed rgba(255,255,255,.18); font-size: 13px; color: var(--creamtxt); line-height: 1.45; text-align: left; }
     .cardHint::before { content: "🤝"; }
@@ -780,6 +789,17 @@
             <button id="joinBtn" class="btnJoin" data-i18n="btn.join">Entrar</button>
           </div>
 
+          <div class="orSep"><span data-i18n="or.ranked">ou joga valendo ranking</span></div>
+          <div class="createRow">
+            <button id="rankedBtn" class="btnMode">
+              <span class="bmTitle">🏆 <span data-i18n="mode.ranked">Ranqueado</span></span>
+              <span class="bmSub" data-i18n="mode.rankedSub">1v1 online · vale ELO</span>
+            </button>
+            <button id="lbBtn" class="btnMode">
+              <span class="bmTitle">📋 <span data-i18n="mode.lb">Ranking</span></span>
+              <span class="bmSub" data-i18n="mode.lbSub">top da temporada</span>
+            </button>
+          </div>
           <div class="orSep"><span data-i18n="or.bot">ou treina com o bot</span></div>
           <div class="botRow">
             <button class="botLvl" data-lvl="iniciante" data-i18n="bot.beginner">Iniciante</button>
@@ -845,6 +865,15 @@
   </div>
 
   <!-- aviso de aceleração gráfica desativada (WebGL por software) -->
+  <div id="lbModal" class="overlay hidden" style="z-index:40">
+    <div class="panel">
+      <h2>📋 <span data-i18n="mode.lb">Ranking</span></h2>
+      <p id="lbSeason" class="sub"></p>
+      <div id="lbList" class="lbList"></div>
+      <button id="lbCloseBtn" class="tlGhost" data-i18n="lb.close">Fechar</button>
+    </div>
+  </div>
+
   <div id="gpuModal" class="overlay hidden" style="z-index:40">
     <div class="panel">
       <h2 data-i18n="gpu.slow.title">🐢 Tá rodando no modo lento…</h2>
@@ -946,18 +975,22 @@
       function startApp() {
         loadObjLoader(function () {
           loadPeer(function () {
+            loadScript('rules.js', function () {
             loadScript('physics.js', function () {
               loadScript('audio.js', function () {
                 loadScript('menu.js', function () {
+                  loadScript('ranked.js', function () {
                   loadScript('net.js', function () {
                     loadScript('bot.js', function () {
                       var g = function () { loadScript('game3d.js', function () {}, function () { fail(T('err.file', { file: 'game3d.js' })); }); };
                       loadScript('table3d_collider.js', g, g); // colisor do modelo (opcional)
                     }, function () { fail(T('err.file', { file: 'bot.js' })); });
                   }, function () { fail(T('err.file', { file: 'net.js' })); });
+                  }, function () { fail(T('err.file', { file: 'ranked.js' })); });
                 }, function () { fail(T('err.file', { file: 'menu.js' })); });
               }, function () { fail(T('err.file', { file: 'audio.js' })); });
             }, function () { fail(T('err.file', { file: 'physics.js' })); });
+            }, function () { fail(T('err.file', { file: 'rules.js' })); });
           });
         });
       }

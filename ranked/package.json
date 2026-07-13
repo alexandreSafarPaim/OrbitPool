@@ -1,0 +1,17 @@
+{
+  "name": "orbitpool-ranked",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Servidor autoritativo ranqueado do OrbitPool (Cloudflare Workers + DO + D1)",
+  "scripts": {
+    "gen": "node gen-engine.js",
+    "dev": "node gen-engine.js && wrangler dev --env dev --port 8787",
+    "deploy": "node gen-engine.js && wrangler deploy",
+    "db:local": "wrangler d1 execute orbitpool --env dev --file=schema.sql --local",
+    "db:remote": "wrangler d1 execute orbitpool --file=schema.sql --remote",
+    "test": "node test/play.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4"
+  }
+}
