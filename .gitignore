@@ -9,3 +9,8 @@ assets/
 *.log
 .DS_Store
 dist/
+
+# ranked (Worker Cloudflare)
+ranked/node_modules/
+ranked/.wrangler/
+ranked/src/engine.mjs

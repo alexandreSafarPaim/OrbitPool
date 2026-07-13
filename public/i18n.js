@@ -15,9 +15,165 @@ window.OrbitI18N = (function () {
   const LSKEY = 'orbitpool.lang';
   const SUPPORTED = ['en', 'pt', 'es', 'fr'];
   const NAMES = { en: 'English', pt: 'Português', es: 'Español', fr: 'Français' };
+  const OGLOCALE = { en: 'en_US', pt: 'pt_BR', es: 'es_ES', fr: 'fr_FR' };
+  const CANON_BASE = 'https://orbitpool.com.br/';
 
   // ---- Dicionário: chave → { en, pt, es, fr } ------------------------------
   const D = {
+    // ---- Conta / abas do menu / login -----------------------------------
+    'acct.guestTitle': { pt: 'Jogando como convidado', en: 'Playing as guest', es: 'Jugando como invitado', fr: 'Vous jouez en invité' },
+    'acct.guestSub': { pt: 'entre pra salvar ELO e stats', en: 'sign in to save your ELO & stats', es: 'entra para guardar ELO y stats', fr: 'connectez-vous pour garder votre ELO' },
+    'acct.login': { pt: 'Entrar', en: 'Sign in', es: 'Entrar', fr: 'Connexion' },
+    'acct.logout': { pt: 'Sair', en: 'Sign out', es: 'Salir', fr: 'Quitter' },
+    'acct.logged': { pt: 'ELO {elo} · logado', en: 'ELO {elo} · signed in', es: 'ELO {elo} · conectado', fr: 'ELO {elo} · connecté' },
+    'acct.loggedNoElo': { pt: 'logado', en: 'signed in', es: 'conectado', fr: 'connecté' },
+    'tab.play': { pt: 'Jogar', en: 'Play', es: 'Jugar', fr: 'Jouer' },
+    'tab.ranked': { pt: 'Ranqueada', en: 'Ranked', es: 'Clasificatoria', fr: 'Classé' },
+    'tab.bot': { pt: 'Treino', en: 'Practice', es: 'Práctica', fr: 'Entraînement' },
+    'or.code': { pt: 'ou entra por código', en: 'or join with a code', es: 'o entra con código', fr: 'ou entrez avec un code' },
+    'rk.lockTitle': { pt: 'precisa se identificar', en: 'you need to sign in', es: 'necesitas identificarte', fr: 'identifiez-vous' },
+    'rk.lockSub': { pt: 'a ranqueada vale ELO — entre na conta ou jogue como convidado.', en: 'ranked is ELO-rated — sign in or play as a guest.', es: 'la clasificatoria vale ELO — entra o juega como invitado.', fr: 'le classé compte pour l’ELO — connectez-vous ou jouez en invité.' },
+    'rk.loginCta': { pt: 'Entrar pra jogar ranqueada', en: 'Sign in to play ranked', es: 'Entra para jugar clasificatoria', fr: 'Connectez-vous pour le classé' },
+    'rk.guestCta': { pt: 'Jogar ranqueada como convidado', en: 'Play ranked as guest', es: 'Jugar clasificatoria como invitado', fr: 'Jouer classé en invité' },
+    'rk.queueCta': { pt: 'Entrar na fila 1v1 · vale ELO', en: 'Join the 1v1 queue · ELO rated', es: 'Entrar a la cola 1v1 · vale ELO', fr: 'File 1v1 · compte pour l’ELO' },
+    'rk.lbCta': { pt: 'Ver ranking da temporada', en: 'View season leaderboard', es: 'Ver ranking de la temporada', fr: 'Voir le classement de la saison' },
+    'auth.title2': { pt: 'Entrar na conta', en: 'Sign in', es: 'Entrar en la cuenta', fr: 'Connexion' },
+    'auth.tag': { pt: '— pra jogar valendo ELO —', en: '— to play for ELO —', es: '— para jugar por ELO —', fr: '— pour jouer classé —' },
+    'auth.name': { pt: 'nome', en: 'name', es: 'nombre', fr: 'nom' },
+    'auth.email': { pt: 'e-mail', en: 'email', es: 'correo', fr: 'e-mail' },
+    'auth.pass': { pt: 'senha', en: 'password', es: 'contraseña', fr: 'mot de passe' },
+    'auth.signin': { pt: 'Entrar', en: 'Sign in', es: 'Entrar', fr: 'Connexion' },
+    'auth.signup': { pt: 'Criar conta', en: 'Create account', es: 'Crear cuenta', fr: 'Créer un compte' },
+    'auth.noAccount': { pt: 'não tem conta?', en: 'no account yet?', es: '¿no tienes cuenta?', fr: 'pas de compte ?' },
+    'auth.create': { pt: 'criar rapidinho', en: 'create one in seconds', es: 'créala rapidito', fr: 'créez-en un vite fait' },
+    'auth.haveAccount': { pt: 'já tem conta?', en: 'already have an account?', es: '¿ya tienes cuenta?', fr: 'déjà un compte ?' },
+    'auth.toSignin': { pt: 'entrar', en: 'sign in', es: 'entrar', fr: 'se connecter' },
+    'auth.or': { pt: 'ou', en: 'or', es: 'o', fr: 'ou' },
+    'auth.err.invalid': { pt: 'E-mail ou senha incorretos.', en: 'Wrong email or password.', es: 'Correo o contraseña incorrectos.', fr: 'E-mail ou mot de passe incorrect.' },
+    'auth.err.emailInUse': { pt: 'Esse e-mail já tem conta — tenta entrar.', en: 'That email already has an account — try signing in.', es: 'Ese correo ya tiene cuenta — intenta entrar.', fr: 'Cet e-mail a déjà un compte — connectez-vous.' },
+    'auth.err.weakPass': { pt: 'Senha muito curta (mínimo 6 caracteres).', en: 'Password too short (6+ characters).', es: 'Contraseña muy corta (mínimo 6).', fr: 'Mot de passe trop court (6 min).' },
+    'auth.err.badEmail': { pt: 'E-mail inválido.', en: 'Invalid email.', es: 'Correo inválido.', fr: 'E-mail invalide.' },
+    'auth.err.tooMany': { pt: 'Muitas tentativas — espera um pouco.', en: 'Too many attempts — wait a bit.', es: 'Demasiados intentos — espera un poco.', fr: 'Trop de tentatives — patientez.' },
+    'auth.err.popup': { pt: 'A janela do Google foi fechada/bloqueada.', en: 'The Google window was closed/blocked.', es: 'La ventana de Google se cerró/bloqueó.', fr: 'La fenêtre Google a été fermée/bloquée.' },
+    'auth.err.network': { pt: 'Sem conexão — tenta de novo.', en: 'No connection — try again.', es: 'Sin conexión — inténtalo de nuevo.', fr: 'Pas de connexion — réessayez.' },
+    'auth.err.needName': { pt: 'Diz teu nome pra criar a conta.', en: 'Tell us your name to create the account.', es: 'Dinos tu nombre para crear la cuenta.', fr: 'Indiquez votre nom pour créer le compte.' },
+    'auth.err.generic': { pt: 'Não deu — tenta de novo.', en: 'Something failed — try again.', es: 'Algo falló — inténtalo de nuevo.', fr: 'Échec — réessayez.' },
+    // ---- Ranqueado / leaderboard --------------------------------------
+    'or.ranked': { pt: 'ou joga valendo ranking', en: 'or play ranked', es: 'o juega clasificatoria', fr: 'ou jouez en classé' },
+    'mode.ranked': { pt: 'Ranqueado', en: 'Ranked', es: 'Clasificatoria', fr: 'Classé' },
+    'mode.rankedSub': { pt: '1v1 online · vale ELO', en: '1v1 online · ELO rated', es: '1v1 online · con ELO', fr: '1v1 en ligne · classé ELO' },
+    'mode.lb': { pt: 'Ranking', en: 'Leaderboard', es: 'Ranking', fr: 'Classement' },
+    'mode.lbSub': { pt: 'top da temporada', en: 'season top players', es: 'top de la temporada', fr: 'top de la saison' },
+    'rk.searching': { pt: 'Procurando adversário… (deixa aberto!)', en: 'Searching for an opponent… (keep this open!)', es: 'Buscando rival… (¡no cierres!)', fr: 'Recherche d’un adversaire… (gardez la page ouverte !)' },
+    'rk.needLogin': { pt: 'É preciso entrar (Google ou convidado) para jogar ranqueado.', en: 'You need to sign in (Google or guest) to play ranked.', es: 'Debes iniciar sesión (Google o invitado) para jugar clasificatoria.', fr: 'Connectez-vous (Google ou invité) pour jouer en classé.' },
+    'auth.title': { pt: '🏆 Entrar para jogar ranqueado', en: '🏆 Sign in to play ranked', es: '🏆 Inicia sesión para jugar clasificatoria', fr: '🏆 Connectez-vous pour jouer en classé' },
+    'auth.sub': { pt: 'Sua identidade protege o ranking contra trapaça.', en: 'Your identity protects the leaderboard from cheating.', es: 'Tu identidad protege el ranking contra trampas.', fr: 'Votre identité protège le classement contre la triche.' },
+    'auth.google': { pt: 'Entrar com Google', en: 'Sign in with Google', es: 'Iniciar sesión con Google', fr: 'Se connecter avec Google' },
+    'auth.guest': { pt: '🎭 Jogar como convidado', en: '🎭 Play as guest', es: '🎭 Jugar como invitado', fr: '🎭 Jouer en invité' },
+    'auth.cancel': { pt: 'Cancelar', en: 'Cancel', es: 'Cancelar', fr: 'Annuler' },
+    'auth.note': { pt: 'Convidado: seu ELO fica salvo só neste navegador. Com Google, vale em qualquer aparelho.', en: 'Guest: your ELO is saved in this browser only. With Google it follows you anywhere.', es: 'Invitado: tu ELO se guarda solo en este navegador. Con Google te sigue en cualquier dispositivo.', fr: 'Invité : votre ELO reste dans ce navigateur. Avec Google, il vous suit partout.' },
+    'rk.connFail': { pt: 'Não deu para falar com o servidor ranqueado. Tenta de novo.', en: 'Could not reach the ranked server. Try again.', es: 'No se pudo conectar al servidor clasificatorio. Inténtalo de nuevo.', fr: 'Impossible de joindre le serveur classé. Réessayez.' },
+    'rk.authFail': { pt: 'Conexão recusada (login inválido ou servidor fora).', en: 'Connection refused (invalid sign-in or server down).', es: 'Conexión rechazada (sesión inválida o servidor caído).', fr: 'Connexion refusée (session invalide ou serveur indisponible).' },
+    'rk.wonWO': { pt: 'O adversário abandonou — vitória por W.O.!', en: 'Your opponent left — you win by forfeit!', es: 'Tu rival abandonó — ¡ganas por abandono!', fr: 'Votre adversaire a quitté — victoire par forfait !' },
+    'rk.lostWO': { pt: 'Tempo esgotado/abandono — derrota por W.O.', en: 'Time out/abandon — you lose by forfeit.', es: 'Tiempo agotado/abandono — pierdes por abandono.', fr: 'Temps écoulé/abandon — défaite par forfait.' },
+    'rk.eloDelta': { pt: 'ELO {delta}.', en: 'ELO {delta}.', es: 'ELO {delta}.', fr: 'ELO {delta}.' },
+    'rk.again': { pt: '🏆 Buscar outra partida', en: '🏆 Find another match', es: '🏆 Buscar otra partida', fr: '🏆 Chercher une autre partie' },
+    'lb.title': { pt: 'Temporada {season}', en: 'Season {season}', es: 'Temporada {season}', fr: 'Saison {season}' },
+    'lb.close': { pt: 'Fechar', en: 'Close', es: 'Cerrar', fr: 'Fermer' },
+    'lb.wl': { pt: '{w}V · {l}D', en: '{w}W · {l}L', es: '{w}V · {l}D', fr: '{w}V · {l}D' },
+    'lb.empty': { pt: 'Ninguém no ranking ainda — seja o primeiro!', en: 'Nobody ranked yet — be the first!', es: 'Nadie en el ranking todavía — ¡sé el primero!', fr: 'Personne au classement — soyez le premier !' },
+    // SEO — título e descrição por idioma (aplicados no <head> por updateHead)
+    'meta.title': {
+      pt: 'OrbitPool — Sinuca 8-Ball 3D Multiplayer Online Grátis',
+      en: 'OrbitPool — Free Online 3D 8-Ball Pool Multiplayer',
+      es: 'OrbitPool — Billar 8-Ball 3D Multijugador Online Gratis',
+      fr: 'OrbitPool — Billard 8-Ball 3D Multijoueur en Ligne Gratuit',
+    },
+    'meta.desc': {
+      pt: 'OrbitPool é um jogo de sinuca (8-Ball) 3D multiplayer online e gratuito. Jogue no navegador, sem instalar e sem cadastro: crie uma sala, envie o código a um amigo e joguem em tempo real.',
+      en: 'OrbitPool is a free online 3D 8-Ball pool game you play in the browser — no install, no sign-up. Create a room, send the code to a friend and play real-time multiplayer.',
+      es: 'OrbitPool es un juego de billar (8-Ball) 3D multijugador online y gratis. Juega en el navegador, sin instalar y sin registro: crea una sala, envía el código a un amigo y jueguen en tiempo real.',
+      fr: 'OrbitPool est un jeu de billard (8-Ball) 3D multijoueur en ligne et gratuit. Jouez dans le navigateur, sans installation ni inscription : créez une salle, envoyez le code à un ami et jouez en temps réel.',
+    },
+    // SEO — H1 (texto para leitores de tela/crawlers) e bloco "Sobre / FAQ"
+    'seo.h1': {
+      pt: ' — Jogue Sinuca 8-Ball 3D Multiplayer Online Grátis, direto no navegador, sem instalar e sem cadastro',
+      en: ' — Play Free Online 3D 8-Ball Pool Multiplayer, right in your browser, no install and no sign-up',
+      es: ' — Juega al Billar 8-Ball 3D Multijugador Online Gratis, en el navegador, sin instalar y sin registro',
+      fr: ' — Jouez au Billard 8-Ball 3D Multijoueur en Ligne Gratuit, dans le navigateur, sans installation ni inscription',
+    },
+    'about.toggle': { pt: 'ℹ Sobre o jogo & FAQ', en: 'ℹ About the game & FAQ', es: 'ℹ Sobre el juego y FAQ', fr: 'ℹ À propos du jeu & FAQ' },
+    'about.h2': {
+      pt: 'OrbitPool — sinuca 8-Ball 3D online e grátis',
+      en: 'OrbitPool — free online 3D 8-Ball pool',
+      es: 'OrbitPool — billar 8-Ball 3D online y gratis',
+      fr: 'OrbitPool — billard 8-Ball 3D en ligne et gratuit',
+    },
+    'about.p1': {
+      pt: 'O OrbitPool é um jogo de sinuca (bilhar 8-Ball) em 3D para jogar online, de graça e direto no navegador — sem baixar nada, sem instalar e sem cadastro. Crie uma sala, envie o código para um amigo e joguem uma partida de pool multiplayer em tempo real por conexão P2P. Funciona no computador e no celular (mouse ou toque).',
+      en: 'OrbitPool is a 3D 8-Ball pool game you play online, for free and right in your browser — no download, no install and no sign-up. Create a room, send the code to a friend and play a real-time multiplayer pool match over a P2P connection. Works on desktop and mobile (mouse or touch).',
+      es: 'OrbitPool es un juego de billar (8-Ball) en 3D para jugar online, gratis y directo en el navegador — sin descargar nada, sin instalar y sin registro. Crea una sala, envía el código a un amigo y jueguen una partida de billar multijugador en tiempo real por conexión P2P. Funciona en el ordenador y en el móvil (ratón o táctil).',
+      fr: 'OrbitPool est un jeu de billard (8-Ball) en 3D à jouer en ligne, gratuitement et directement dans le navigateur — sans téléchargement, sans installation et sans inscription. Créez une salle, envoyez le code à un ami et jouez une partie de billard multijoueur en temps réel via une connexion P2P. Fonctionne sur ordinateur et mobile (souris ou tactile).',
+    },
+    'about.h3play': {
+      pt: 'Como jogar sinuca online no OrbitPool',
+      en: 'How to play pool online on OrbitPool',
+      es: 'Cómo jugar al billar online en OrbitPool',
+      fr: 'Comment jouer au billard en ligne sur OrbitPool',
+    },
+    'about.pplay': {
+      pt: 'Mire com o mouse, segure CTRL e puxe para trás para carregar a força, e solte para dar a tacada. Use SHIFT para aplicar efeito (inglês, follow e draw), TAB para ver a mesa de cima e o scroll para dar zoom. Você também pode jogar contra o bot (treino) ou em duplas com os amigos.',
+      en: 'Aim with the mouse, hold CTRL and pull back to charge power, then release to take the shot. Use SHIFT to apply spin (english, follow and draw), TAB for the top view and scroll to zoom. You can also play against the bot (practice) or in teams with friends.',
+      es: 'Apunta con el ratón, mantén CTRL y tira hacia atrás para cargar la fuerza, y suelta para dar el golpe. Usa SHIFT para aplicar efecto (inglés, follow y draw), TAB para ver la mesa desde arriba y el scroll para acercar. También puedes jugar contra el bot (práctica) o en parejas con amigos.',
+      fr: 'Visez avec la souris, maintenez CTRL et tirez vers l’arrière pour charger la puissance, puis relâchez pour tirer. Utilisez SHIFT pour appliquer l’effet (rétro, coulé et rappel), TAB pour la vue de dessus et la molette pour zoomer. Vous pouvez aussi jouer contre le bot (entraînement) ou en équipes avec des amis.',
+    },
+    'about.h3rules': {
+      pt: 'Regras do 8-Ball', en: '8-Ball rules', es: 'Reglas del 8-Ball', fr: 'Règles du 8-Ball',
+    },
+    'about.prules': {
+      pt: 'A mesa começa aberta. Quem encaçapa a primeira bola numerada define seu grupo: lisas (1–7) ou listradas (9–15). Acertou uma bola do seu grupo, continua jogando; errou, passa a vez. Faltas (branca na caçapa, não tocar em bola ou acertar a bola errada primeiro) dão bola na mão ao adversário. Você vence ao encaçapar a bola 8 depois de limpar todo o seu grupo.',
+      en: 'The table starts open. Whoever pots the first numbered ball claims their group: solids (1–7) or stripes (9–15). Pot a ball from your group and you keep shooting; miss and it is the opponent’s turn. Fouls (potting the cue ball, hitting no ball, or hitting the wrong ball first) give the opponent ball in hand. You win by potting the 8-ball after clearing your whole group.',
+      es: 'La mesa empieza abierta. Quien mete la primera bola numerada define su grupo: lisas (1–7) o rayadas (9–15). Si metes una bola de tu grupo sigues jugando; si fallas, pasa el turno. Las faltas (meter la blanca, no tocar bola o golpear primero la bola equivocada) dan bola en mano al rival. Ganas metiendo la bola 8 tras limpiar todo tu grupo.',
+      fr: 'La table commence ouverte. Celui qui empoche la première bille numérotée choisit son groupe : pleines (1–7) ou rayées (9–15). Empochez une bille de votre groupe et vous rejouez ; ratez et c’est au tour de l’adversaire. Les fautes (bille blanche empochée, aucune bille touchée ou mauvaise bille touchée en premier) donnent bille en main à l’adversaire. Vous gagnez en empochant la bille 8 après avoir nettoyé tout votre groupe.',
+    },
+    'about.h3faq': {
+      pt: 'Perguntas frequentes', en: 'Frequently asked questions', es: 'Preguntas frecuentes', fr: 'Questions fréquentes',
+    },
+    'about.q1': { pt: 'O OrbitPool é gratuito?', en: 'Is OrbitPool free?', es: '¿OrbitPool es gratis?', fr: 'OrbitPool est-il gratuit ?' },
+    'about.a1': {
+      pt: 'Sim, é 100% grátis e sem cadastro. Basta abrir no navegador e jogar.',
+      en: 'Yes, it is 100% free with no sign-up. Just open it in your browser and play.',
+      es: 'Sí, es 100% gratis y sin registro. Solo ábrelo en el navegador y juega.',
+      fr: 'Oui, c’est 100% gratuit et sans inscription. Ouvrez-le simplement dans le navigateur et jouez.',
+    },
+    'about.q2': { pt: 'Preciso instalar alguma coisa?', en: 'Do I need to install anything?', es: '¿Necesito instalar algo?', fr: 'Dois-je installer quelque chose ?' },
+    'about.a2': {
+      pt: 'Não. O jogo roda direto no navegador (com WebGL) no PC ou no celular. Também dá para instalar como app (PWA), se quiser.',
+      en: 'No. The game runs right in the browser (with WebGL) on PC or mobile. You can also install it as an app (PWA) if you like.',
+      es: 'No. El juego funciona directo en el navegador (con WebGL) en PC o móvil. También puedes instalarlo como app (PWA) si quieres.',
+      fr: 'Non. Le jeu tourne directement dans le navigateur (avec WebGL) sur PC ou mobile. Vous pouvez aussi l’installer comme application (PWA) si vous le souhaitez.',
+    },
+    'about.q3': { pt: 'Como jogo com um amigo?', en: 'How do I play with a friend?', es: '¿Cómo juego con un amigo?', fr: 'Comment jouer avec un ami ?' },
+    'about.a3': {
+      pt: 'Crie uma sala, copie o código e mande para o seu amigo. Quando ele entrar com o mesmo código, a partida multiplayer começa em tempo real.',
+      en: 'Create a room, copy the code and send it to your friend. When they join with the same code, the real-time multiplayer match begins.',
+      es: 'Crea una sala, copia el código y envíalo a tu amigo. Cuando entre con el mismo código, la partida multijugador comienza en tiempo real.',
+      fr: 'Créez une salle, copiez le code et envoyez-le à votre ami. Dès qu’il rejoint avec le même code, la partie multijoueur en temps réel commence.',
+    },
+    'about.q4': { pt: 'Dá para jogar sozinho?', en: 'Can I play solo?', es: '¿Puedo jugar solo?', fr: 'Puis-je jouer en solo ?' },
+    'about.a4': {
+      pt: 'Sim. Há um modo de treino contra o bot, com opção de linha guia para praticar as tacadas.',
+      en: 'Yes. There is a practice mode against the bot, with an optional guide line to practice your shots.',
+      es: 'Sí. Hay un modo de práctica contra el bot, con línea guía opcional para practicar los golpes.',
+      fr: 'Oui. Il y a un mode entraînement contre le bot, avec une ligne de visée optionnelle pour travailler vos tirs.',
+    },
+    'about.q5': { pt: 'Funciona no celular?', en: 'Does it work on mobile?', es: '¿Funciona en el móvil?', fr: 'Ça marche sur mobile ?' },
+    'about.a5': {
+      pt: 'Funciona. Os controles por toque aparecem automaticamente em telas de celular e tablet.',
+      en: 'It does. Touch controls appear automatically on phone and tablet screens.',
+      es: 'Sí. Los controles táctiles aparecen automáticamente en pantallas de móvil y tablet.',
+      fr: 'Oui. Les commandes tactiles apparaissent automatiquement sur les écrans de téléphone et tablette.',
+    },
     // ===== Lobby (letreiro + quadro) =====
     'lobby.badge': { en: '🍺 up for a game of pool?', pt: '🍺 bora jogar uma sinuca?', es: '🍺 ¿echamos una partida de billar?', fr: '🍺 on se fait un billard ?' },
     'lobby.tagline': { en: '~ dive bar pool ~', pt: '~ sinuca de boteco ~', es: '~ billar de cantina ~', fr: '~ billard de bistrot ~' },
@@ -77,6 +233,9 @@ window.OrbitI18N = (function () {
     'grp.solids': { en: 'solids', pt: 'lisas', es: 'lisas', fr: 'pleines' },
     'grp.stripes': { en: 'stripes', pt: 'listradas', es: 'rayadas', fr: 'rayées' },
     'sb.series': { en: 'BEST OF {n}', pt: 'MELHOR DE {n}', es: 'MEJOR DE {n}', fr: 'MEILLEUR DES {n}' },
+    'sb.single': { en: 'SINGLE GAME', pt: 'PARTIDA ÚNICA', es: 'PARTIDA ÚNICA', fr: 'PARTIE UNIQUE' },
+    'tl.series': { en: 'best-of-3 series', pt: 'série melhor de 3', es: 'serie al mejor de 3', fr: 'série au meilleur des 3' },
+    'btn.playAgain': { en: '🎱 Play again', pt: '🎱 Jogar de novo', es: '🎱 Jugar de nuevo', fr: '🎱 Rejouer' },
     'hud.controls': { en: 'CONTROLS', pt: 'CONTROLES', es: 'CONTROLES', fr: 'COMMANDES' },
     'k.click': { en: 'Click', pt: 'Clique', es: 'Clic', fr: 'Clic' },
     'd.click': { en: 'lock cursor', pt: 'travar cursor', es: 'bloquear cursor', fr: 'verrouiller le curseur' },
@@ -168,10 +327,10 @@ window.OrbitI18N = (function () {
     'end.title': { en: 'Game over', pt: 'Fim de jogo', es: 'Fin del juego', fr: 'Fin de partie' },
     'btn.rematch': { en: 'Play again', pt: 'Jogar de novo', es: 'Jugar de nuevo', fr: 'Rejouer' },
     'end.waitingOpp': { en: 'Waiting for the opponent…', pt: 'Aguardando o adversário...', es: 'Esperando al rival…', fr: 'En attente de l\'adversaire…' },
-    'end.wonSeries.you': { en: '🏆 You won the best of 5!', pt: '🏆 Você venceu o melhor de 5!', es: '🏆 ¡Ganaste el mejor de 5!', fr: '🏆 Tu as gagné le meilleur des 5 !' },
-    'end.wonSeries.team': { en: '🏆 Your team won the best of 5!', pt: '🏆 Seu time venceu o melhor de 5!', es: '🏆 ¡Tu equipo ganó el mejor de 5!', fr: '🏆 Ton équipe a gagné le meilleur des 5 !' },
-    'end.lostSeries.you': { en: '😞 You lost the best of 5', pt: '😞 Você perdeu o melhor de 5', es: '😞 Perdiste el mejor de 5', fr: '😞 Tu as perdu le meilleur des 5' },
-    'end.lostSeries.team': { en: '😞 Your team lost the best of 5', pt: '😞 Seu time perdeu o melhor de 5', es: '😞 Tu equipo perdió el mejor de 5', fr: '😞 Ton équipe a perdu le meilleur des 5' },
+    'end.wonSeries.you': { en: '🏆 You won the best of 3!', pt: '🏆 Você venceu o melhor de 3!', es: '🏆 ¡Ganaste el mejor de 3!', fr: '🏆 Tu as gagné le meilleur des 3 !' },
+    'end.wonSeries.team': { en: '🏆 Your team won the best of 3!', pt: '🏆 Seu time venceu o melhor de 3!', es: '🏆 ¡Tu equipo ganó el mejor de 3!', fr: '🏆 Ton équipe a gagné le meilleur des 3 !' },
+    'end.lostSeries.you': { en: '😞 You lost the best of 3', pt: '😞 Você perdeu o melhor de 3', es: '😞 Perdiste el mejor de 3', fr: '😞 Tu as perdu le meilleur des 3' },
+    'end.lostSeries.team': { en: '😞 Your team lost the best of 3', pt: '😞 Seu time perdeu o melhor de 3', es: '😞 Tu equipo perdió el mejor de 3', fr: '😞 Ton équipe a perdu le meilleur des 3' },
     'end.finalScore': { en: 'Final score: {a} – {b}.', pt: 'Placar final: {a} – {b}.', es: 'Marcador final: {a} – {b}.', fr: 'Score final : {a} – {b}.' },
     'btn.newSeries': { en: 'New series', pt: 'Nova série', es: 'Nueva serie', fr: 'Nouvelle série' },
     'end.wonGame.you': { en: '🎉 You won the game!', pt: '🎉 Você venceu a partida!', es: '🎉 ¡Ganaste la partida!', fr: '🎉 Tu as gagné la partie !' },
@@ -275,6 +434,10 @@ window.OrbitI18N = (function () {
   // ---- Detecção: localStorage → idioma do sistema → inglês -----------------
   function detect() {
     try {
+      const p = new URLSearchParams(location.search).get('lang');
+      if (SUPPORTED.includes(p)) return p; // ?lang= tem prioridade (variantes hreflang)
+    } catch (e) {}
+    try {
       const saved = localStorage.getItem(LSKEY);
       if (SUPPORTED.includes(saved)) return saved;
     } catch (e) {}
@@ -294,6 +457,37 @@ window.OrbitI18N = (function () {
     return s;
   }
 
+  // Atualiza <head> (título, descrição, canonical, Open Graph) p/ o idioma atual.
+  function setAttr(sel, attr, val) {
+    const el = document.head && document.head.querySelector(sel);
+    if (el) el.setAttribute(attr, val);
+  }
+  function updateHead() {
+    const canon = CANON_BASE + '?lang=' + lang;
+    const title = t('meta.title'), desc = t('meta.desc');
+    document.title = title;
+    setAttr('meta[name="description"]', 'content', desc);
+    setAttr('link[rel="canonical"]', 'href', canon);
+    setAttr('meta[property="og:url"]', 'content', canon);
+    setAttr('meta[property="og:title"]', 'content', title);
+    setAttr('meta[property="og:description"]', 'content', desc);
+    setAttr('meta[property="og:locale"]', 'content', OGLOCALE[lang]);
+    setAttr('meta[name="twitter:title"]', 'content', title);
+    setAttr('meta[name="twitter:description"]', 'content', desc);
+  }
+
+  // Mantém o ?lang= da URL em sincronia com o idioma (auto-canonicaliza a variante).
+  function syncUrl() {
+    try {
+      const cur = new URLSearchParams(location.search).get('lang');
+      if (cur !== lang && history.replaceState) {
+        const u = new URL(location.href);
+        u.searchParams.set('lang', lang);
+        history.replaceState(null, '', u.pathname + u.search + u.hash);
+      }
+    } catch (e) {}
+  }
+
   // Traduz os elementos estáticos marcados com data-i18n* (idempotente).
   function apply(root) {
     root = root || document;
@@ -302,6 +496,8 @@ window.OrbitI18N = (function () {
     root.querySelectorAll('[data-i18n-ph]').forEach((el) => { el.placeholder = t(el.getAttribute('data-i18n-ph')); });
     root.querySelectorAll('[data-i18n-aria]').forEach((el) => { el.setAttribute('aria-label', t(el.getAttribute('data-i18n-aria'))); });
     document.documentElement.setAttribute('lang', lang === 'pt' ? 'pt-BR' : lang);
+    updateHead();
+    syncUrl();
     // Sincroniza os seletores de idioma existentes.
     document.querySelectorAll('select.i18n-lang').forEach((sel) => { if (sel.value !== lang) sel.value = lang; });
   }

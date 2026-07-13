@@ -1,0 +1,57 @@
+# OrbitPool ranqueado — Worker + Durable Objects + D1 (tudo no plano free).
+# Setup (uma vez):
+#   npx wrangler login
+#   npx wrangler d1 create orbitpool           → cole o database_id abaixo
+#   npx wrangler d1 execute orbitpool --file=schema.sql --remote
+#   npm run deploy
+name = "orbitpool-ranked"
+main = "src/index.mjs"
+compatibility_date = "2026-06-01"
+
+[[durable_objects.bindings]]
+name = "RANKED_ROOM"
+class_name = "RankedRoom"
+
+[[durable_objects.bindings]]
+name = "MATCH_QUEUE"
+class_name = "MatchQueue"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["RankedRoom", "MatchQueue"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "orbitpool"
+database_id = "678ff534-aaea-4217-b577-fb57a0c3891d"
+
+[vars]
+# Origens permitidas (CORS) — inclua localhost só enquanto testa.
+ALLOWED_ORIGINS = "https://orbitpool.com.br,http://localhost:3000"
+FIREBASE_PROJECT_ID = "orbitpool-49e20"
+# NUNCA "true" em produção — usado apenas pelos testes locais.
+ALLOW_DEV_AUTH = "false"
+
+# Config só do `wrangler dev` local:
+[env.dev.vars]
+ALLOWED_ORIGINS = "*"
+FIREBASE_PROJECT_ID = "orbitpool-49e20"
+ALLOW_DEV_AUTH = "true"
+
+[env.dev]
+[[env.dev.durable_objects.bindings]]
+name = "RANKED_ROOM"
+class_name = "RankedRoom"
+
+[[env.dev.durable_objects.bindings]]
+name = "MATCH_QUEUE"
+class_name = "MatchQueue"
+
+[[env.dev.migrations]]
+tag = "v1"
+new_sqlite_classes = ["RankedRoom", "MatchQueue"]
+
+[[env.dev.d1_databases]]
+binding = "DB"
+database_name = "orbitpool"
+database_id = "local-dev"

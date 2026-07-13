@@ -12,9 +12,10 @@ const T = (k, p) => (window.OrbitI18N ? OrbitI18N.t(k, p) : k);
 // ---- Cores das bolas (iguais ao 2D) ---------------------------------------
 const SOLID = { 1: '#f4c430', 2: '#1f5fd0', 3: '#d0322b', 4: '#6a2fa0', 5: '#e07b18', 6: '#1a8f4a', 7: '#7a1f1f' };
 const colorFor = (n) => (n === 8 ? '#161616' : (n <= 7 ? SOLID[n] : SOLID[n - 8]));
-const isStripe = (n) => n >= 9 && n <= 15;
-function groupName(n) { if (n === 8) return 'eight'; if (n >= 1 && n <= 7) return 'solid'; if (n >= 9 && n <= 15) return 'stripe'; return null; }
-const RACK_NUMBERS = [1, 9, 2, 10, 8, 3, 11, 7, 14, 4, 5, 13, 15, 6, 12];
+// Regras puras (compartilhadas com o servidor ranqueado): rules.js
+const isStripe = OrbitRules.isStripe;
+const groupName = OrbitRules.groupName;
+const RACK_NUMBERS = OrbitRules.RACK_NUMBERS;
 const MAXDRAG_PX = 190;   // arraste (px de tela) para potência máxima
 
 // ===========================================================================
@@ -40,10 +41,7 @@ const guideOn = () => (botLevel ? botGuide : roomGuide);
 let lobbyRoster = [];              // lista do lobby 2v2: [{no,name}]
 let teamSel = {};                  // escolha de times do host: no → 1|2
 const teamOf = (no) => (players[no] ? players[no].team : (no === 1 ? 1 : 2));
-const nextTurnAfter = (no) => {
-  const i = TURN_ORDER.indexOf(no);
-  return TURN_ORDER[(i + 1) % TURN_ORDER.length];
-};
+const nextTurnAfter = (no) => OrbitRules.nextTurnAfter(TURN_ORDER, no);
 // Modo treino (single-player): botLevel != null → o adversário é a IA (jogador 2).
 let botLevel = null; const BOT_NO = 2; let botTimer = null;
 const botName = (level) => T(({ iniciante: 'botname.iniciante', amador: 'botname.amador', pro: 'botname.pro', mineirinho: 'botname.mineirinho' })[level] || 'botname.default');
@@ -58,7 +56,15 @@ const game = { open: true, groups: { 1: null, 2: null }, gameOver: false, winner
 // Série melhor-de-5 (primeiro a 3 vitórias vence o match). Placar sincronizado
 // sem rede extra: os dois lados calculam o vencedor de cada partida de forma
 // idêntica (mesma timeline determinística), então incrementam igual.
-const SERIES_GAMES = 5, SERIES_TARGET = 3;
+const SERIES_GAMES = 3, SERIES_TARGET = 2; // melhor de 3 (primeiro a 2)
+let roomSeries = true; // config da sala (host): série ligada? (default sim)
+// Série só existe em sala 1v1/2v2 com a opção ligada — bot e ranqueado são únicas.
+const seriesOn = () => !botLevel && !rankedMode && roomSeries;
+// ---- Ranqueado (servidor autoritativo): flags e estado vindos do Worker ----
+let rankedMode = false;   // partida atual é ranqueada?
+let rankedState = null;   // 'state' autoritativo anexado ao último 'shot'
+let rankedResult = null;  // {winner, reason, elo} do fim de partida
+let rankedElo = null;     // ELO dos dois lados no início ({1:..,2:..})
 let matchScore = { 1: 0, 2: 0 }, matchOver = false;
 
 // ===========================================================================
@@ -468,17 +474,12 @@ function updateCamera(dt) {
 }
 
 // ===========================================================================
-// Regras do 8-ball (idênticas ao 2D)
+// Regras do 8-ball — a LÓGICA vive em rules.js (OrbitRules, compartilhado
+// com o servidor ranqueado). Aqui fica só a camada de apresentação: aplicar
+// o resultado ao estado local e traduzir as mensagens (i18n + nomes).
 // ===========================================================================
-function deriveRuleEvents(events) {
-  let firstContact = null, cuePotted = false; const potted = [], pottedOrder = [];
-  for (const e of events) {
-    if (e.type === 'contact' && firstContact === null && (e.a === 0 || e.b === 0)) firstContact = e.a === 0 ? e.b : e.a;
-    if (e.type === 'pocket') { potted.push(e.n); pottedOrder.push(e.n); }
-    if (e.type === 'cuepotted') cuePotted = true;
-  }
-  return { firstContact, cuePotted, potted, pottedOrder };
-}
+const deriveRuleEvents = OrbitRules.deriveRuleEvents;
+// Quantas bolas do grupo ainda estão na mesa (usado pelo HUD).
 function remainingOfGroup(grp) { return balls.filter((b) => !b.potted && groupName(b.n) === grp).length; }
 function playerName(no) { return (players[no] && players[no].name) || (no === myNo ? myName : oppName) || T('hud.playerN', { n: no }); }
 // Nome do time (2v2: "Alex & Bia"; 1v1: nome do jogador).
@@ -487,62 +488,31 @@ function teamLabel(team) {
   return names.join(' & ') || T('team.n', { n: team });
 }
 
-// Regras do 8-ball. GRUPOS, VITÓRIA e FALTAS são por TIME (game.groups é
-// indexado pelo time 1|2). No 1v1 time == playerNo, então nada muda. A vez
-// passa seguindo TURN_ORDER (2v2: alterna time e parceiro — scotch doubles).
+// Converte a mensagem estruturada de OrbitRules em texto no idioma atual.
+function ruleMsgText(m) {
+  switch (m.key) {
+    case 'msg.win8': return T('msg.win8', { team: teamLabel(m.team) });
+    case 'msg.lose8': return T('msg.lose8', { name: playerName(m.shooter), team: teamLabel(m.team) });
+    case 'msg.groups': return T('msg.groups', { team: teamLabel(m.team), group: T(m.group === 'solid' ? 'grp.solids' : 'grp.stripes') });
+    case 'msg.continue': return T('msg.continue', { name: playerName(m.shooter) });
+    case 'msg.oppBall': return T('msg.oppBall', { name: playerName(m.shooter) });
+    case 'msg.foul': return T('msg.foul', { reason: T(m.reason), name: playerName(m.next) });
+    case 'msg.turnOf': return T('msg.turnOf', { name: playerName(m.next) });
+  }
+  return '';
+}
+
 function evaluateShot(ev) {
-  const shooter = currentTurn;
-  const myTeam = teamOf(shooter), oppTeam = myTeam === 1 ? 2 : 1;
-  const nextNo = nextTurnAfter(shooter); // quem joga se a vez passar
-  let foul = false; const reasons = [];
-  if (ev.firstContact === null) { foul = true; reasons.push(T('foul.noContact')); }
-  if (ev.cuePotted) { foul = true; reasons.push(T('foul.scratch')); }
-  if (ev.firstContact !== null) {
-    const fc = groupName(ev.firstContact);
-    if (game.open) { if (fc === 'eight') { foul = true; reasons.push(T('foul.eightFirstOpen')); } }
-    else {
-      const myGrp = game.groups[myTeam];
-      // Estado ANTES da tacada: endShot já marcou como potted as bolas desta
-      // tacada, então soma de volta as do grupo encaçapadas agora. Sem isso,
-      // matar a última bola do grupo virava falta ("devia acertar a 8").
-      const pottedMineNow = ev.potted.filter((n) => groupName(n) === myGrp).length;
-      const cleared = remainingOfGroup(myGrp) + pottedMineNow === 0;
-      if (cleared) { if (fc !== 'eight') { foul = true; reasons.push(T('foul.mustHit8')); } }
-      else if (fc !== myGrp) { foul = true; reasons.push(T('foul.wrongGroup')); }
-    }
-  }
-  const numbered = ev.potted.filter((n) => n !== 8);
-  const eightPotted = ev.potted.includes(8);
-  if (eightPotted) {
-    const myGrp = game.groups[myTeam];
-    // Só é legal se o grupo já estava limpo ANTES desta tacada (WPA: encaçapar
-    // a última bola do grupo e a 8 no mesmo golpe é derrota).
-    const pottedMineNow = ev.potted.filter((n) => groupName(n) === myGrp).length;
-    const clearedBefore = myGrp && remainingOfGroup(myGrp) + pottedMineNow === 0;
-    const legal = !foul && !ev.cuePotted && !game.open && clearedBefore;
-    game.gameOver = true; game.winner = legal ? myTeam : oppTeam; // vencedor = TIME
-    game.lastMsg = legal ? T('msg.win8', { team: teamLabel(myTeam) })
-      : T('msg.lose8', { name: playerName(shooter), team: teamLabel(oppTeam) });
-    return { nextTurn: shooter, ballInHand: false, foul };
-  }
-  let continueTurn = false;
-  if (!foul && game.open && numbered.length) {
-    const first = ev.pottedOrder.find((n) => n !== 8); const grp = groupName(first);
-    if (grp === 'solid' || grp === 'stripe') {
-      game.groups[myTeam] = grp; game.groups[oppTeam] = grp === 'solid' ? 'stripe' : 'solid';
-      game.open = false; continueTurn = true;
-      game.lastMsg = T('msg.groups', { team: teamLabel(myTeam), group: T(grp === 'solid' ? 'grp.solids' : 'grp.stripes') });
-    }
-  } else if (!foul && !game.open && numbered.length) {
-    const myGrp = game.groups[myTeam];
-    if (numbered.some((n) => groupName(n) === myGrp)) { continueTurn = true; game.lastMsg = T('msg.continue', { name: playerName(shooter) }); }
-    else game.lastMsg = T('msg.oppBall', { name: playerName(shooter) });
-  }
-  let nextTurn, bih = false;
-  if (foul) { nextTurn = nextNo; bih = true; game.lastMsg = T('msg.foul', { reason: reasons[0], name: playerName(nextNo) }); }
-  else if (continueTurn) nextTurn = shooter;
-  else { nextTurn = nextNo; if (!game.lastMsg) game.lastMsg = T('msg.turnOf', { name: playerName(nextNo) }); }
-  return { nextTurn, ballInHand: bih, foul };
+  const r = OrbitRules.evaluateShot({
+    shooter: currentTurn, turnOrder: TURN_ORDER, teamOf,
+    open: game.open, groups: game.groups,
+    balls: balls.map((b) => ({ n: b.n, potted: b.potted })), // pós-endShot
+  }, ev);
+  game.open = r.open; game.groups = r.groups;
+  game.gameOver = r.gameOver; game.winner = r.winner;
+  // turnOf é fallback: só exibe se não havia mensagem (comportamento original).
+  if (r.msg && (!r.msg.fallback || !game.lastMsg)) game.lastMsg = ruleMsgText(r.msg);
+  return { nextTurn: r.nextTurn, ballInHand: r.ballInHand, foul: r.foul };
 }
 
 // ===========================================================================
@@ -576,6 +546,18 @@ function endShot() {
   cueDragTarget = null; // o estado final da tacada manda a partir daqui
   for (const fb of shot.finalBalls) { const b = ballByN(fb.n); if (b) { b.x = fb.x; b.y = fb.y; b.potted = fb.potted; b.vx = b.vy = b.wx = b.wy = b.wz = 0; } }
   const result = evaluateShot(deriveRuleEvents(shot.events));
+  if (rankedMode && rankedState) {
+    // Ranqueado: o veredito do SERVIDOR é a verdade (o local é idêntico em
+    // condições normais — isto blinda contra divergência/adulteração).
+    result.nextTurn = rankedState.currentTurn; result.ballInHand = rankedState.ballInHand;
+    game.open = rankedState.open; game.groups = rankedState.groups;
+    game.gameOver = rankedState.gameOver; game.winner = rankedState.winner;
+    if (rankedState.msg && (!rankedState.msg.fallback || !game.lastMsg)) game.lastMsg = ruleMsgText(rankedState.msg);
+    rankedState = null;
+  }
+  if (rankedMode && rankedResult && !game.gameOver) { // W.O. chegou durante a animação
+    game.gameOver = true; game.winner = rankedResult.winner;
+  }
   currentTurn = result.nextTurn; ballInHand = result.ballInHand;
   if (result.foul && !game.gameOver && window.OrbitAudio) OrbitAudio.foul();
   if (cue().potted) { const c = cue(); c.potted = false; c.x = W * 0.25; c.y = H / 2; }
@@ -624,13 +606,16 @@ function handleNet(msg) {
       teamSel = msg.sel || {};
       renderTeamLobby();
       break;
-    case 'roomcfg': // host mudou configurações da sala (linha guia etc.)
+    case 'roomcfg': // host mudou configurações da sala (linha guia, série etc.)
       roomGuide = msg.guide !== false;
+      roomSeries = msg.series !== false;
       if (phase === 'lobby') renderTeamLobby();
       break;
     case 'start': applyStart(msg); break;
     case 'shot': {
       oppAim = null; oppAimTarget = null; cueDragTarget = null; // fim da mira remota
+      if (msg.state) rankedState = msg.state; // veredito do servidor (ranqueado)
+      if (msg.miscue && msg.shooter === myNo) game.lastMsg = T('msg.miscue');
       const shot = { duration: msg.duration, segments: msg.segments, events: msg.events, cueSpeed: msg.cueSpeed, finalBalls: msg.finalBalls };
       if (phase === 'sim' && currentShot) shotQueue.push(shot); else startPlayback(shot);
       break;
@@ -665,6 +650,17 @@ function handleNet(msg) {
       if (msg.for === myNo && phase === 'lobby') applyResync(msg);
       break;
     case 'rematch': doRematch(false); break;
+    case 'rejoined_self': break; // nossa própria reconexão (ranqueado)
+    case 'ranked_result': { // veredito final do servidor (inclui W.O./timeout)
+      rankedResult = msg;
+      if (phase === 'sim') break; // fim normal: endShot cuida ao terminar a animação
+      if (!game.gameOver) {
+        game.gameOver = true; game.winner = msg.winner;
+        if (msg.reason !== 'game') game.lastMsg = T(msg.winner === teamOf(myNo) ? 'rk.wonWO' : 'rk.lostWO');
+        showEnd();
+      } else if (phase === 'ended') renderEndTexts(); // acrescenta o ELO
+      break;
+    }
   }
 }
 
@@ -681,12 +677,13 @@ function sendResync(no) {
     t: 'resync', for: no,
     players, order: TURN_ORDER, slots: roomSlots,
     game: { open: game.open, groups: game.groups, gameOver: game.gameOver, winner: game.winner },
-    matchScore, matchOver, currentTurn, ballInHand, guide: roomGuide,
+    matchScore, matchOver, currentTurn, ballInHand, guide: roomGuide, series: roomSeries,
     balls: balls.map((b) => ({ n: b.n, x: b.x, y: b.y, potted: b.potted })),
   });
 }
 function applyResync(msg) {
   roomGuide = msg.guide !== false;
+  roomSeries = msg.series !== false;
   players = msg.players || players;
   TURN_ORDER = (msg.order || [1, 2]).slice();
   roomSlots = msg.slots || 2;
@@ -711,7 +708,11 @@ function applyResync(msg) {
 
 // Aplica a mensagem 'start' (1v1 legado ou 2v2 com times) e começa o jogo.
 function applyStart(msg) {
+  rankedMode = !!msg.ranked; rankedState = null; rankedResult = null;
+  rankedElo = msg.elo || null;
+  if (rankedMode && OrbitNet.markStarted) OrbitNet.markStarted(); // liga a reconexão
   roomGuide = msg.guide !== false; // config da sala (default: ligada)
+  roomSeries = msg.series !== false;
   if (msg.players && msg.order) { // host montou a sala (1v1 ou 2v2)
     players = msg.players; TURN_ORDER = msg.order.slice(); roomSlots = msg.slots || (msg.order.length === 4 ? 4 : 2);
   } else { // 1v1: monta o roster local a partir do nome do adversário
@@ -726,16 +727,22 @@ function applyStart(msg) {
   currentTurn = msg.startTurn || TURN_ORDER[0];
   matchScore = { 1: 0, 2: 0 }; matchOver = false;
   startGame();
+  // Ranqueado: o SERVIDOR define o rack (o makeBalls local tem jitter próprio).
+  if (msg.balls) for (const fb of msg.balls) {
+    const b = ballByN(fb.n);
+    if (b) { b.x = fb.x; b.y = fb.y; b.potted = !!fb.potted; b._px = b.x; b._py = b.y; }
+  }
 }
 
 // Sai/fecha a sala e volta ao menu inicial SEM recarregar a página: derruba a
 // conexão (OrbitNet.leave), esconde o lobby da sala e destrava os botões.
 function abandonRoom(msgText) {
   try { if (OrbitNet.leave) OrbitNet.leave(); } catch (e) {}
-  myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true;
+  myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true; roomSeries = true;
   const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
   const rs = document.getElementById('roomShare'); if (rs) rs.hidden = true;
-  ['createBtn', 'createBtn2', 'joinBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = false; });
+  ['createBtn', 'createBtn2', 'joinBtn', 'rankedBtn', 'rkGuestBtn', 'rkLoginBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = false; });
+  rankedMode = false; rankedState = null; rankedResult = null; rankedElo = null;
   setLobbyMsg(msgText || '');
 }
 
@@ -763,7 +770,16 @@ function renderTeamLobby() {
     gsw.disabled = !iAmHost;
     gsw.onchange = iAmHost ? () => {
       roomGuide = gsw.checked;
-      send({ t: 'roomcfg', guide: roomGuide });
+      send({ t: 'roomcfg', guide: roomGuide, series: roomSeries });
+    } : null;
+  }
+  const ssw = document.getElementById('tlSeries');
+  if (ssw) {
+    ssw.checked = roomSeries;
+    ssw.disabled = !iAmHost;
+    ssw.onchange = iAmHost ? () => {
+      roomSeries = ssw.checked;
+      send({ t: 'roomcfg', guide: roomGuide, series: roomSeries });
     } : null;
   }
 
@@ -837,7 +853,7 @@ function hostStart2v2() {
     order = [1, 2];
     for (const p of lobbyRoster) pl[p.no] = { name: p.name, team: p.no };
   }
-  const msg = { t: 'start', players: pl, order, startTurn: order[0], slots: roomSlots, guide: roomGuide };
+  const msg = { t: 'start', players: pl, order, startTurn: order[0], slots: roomSlots, guide: roomGuide, series: roomSeries };
   send(msg);
   if (OrbitNet.markStarted) OrbitNet.markStarted();
   applyStart(msg);
@@ -1112,6 +1128,15 @@ function sendCue(force) {
 }
 
 function shoot(power) {
+  if (rankedMode) {
+    // Servidor autoritativo: envia só o input; a timeline volta como 'shot'.
+    send({ t: 'shotinput', ang: Math.atan2(aimDir.y, aimDir.x), power, a: cueOffset.a, b: cueOffset.b });
+    cueOffset = { a: 0, b: 0 }; endContact(); updateContactDot();
+    const ctEl = document.getElementById('contact'); if (ctEl) ctEl.classList.remove('show');
+    const msB = document.getElementById('mbSpin'); if (msB) msB.classList.remove('on');
+    hideAim(); phase = 'wait'; updateHUD();
+    return;
+  }
   const c = cue();
   // cueStrike já aplica o squirt internamente — passar aimDir puro (aplicar
   // squirtedDir aqui dobraria a deflexão e descasaria da linha de mira).
@@ -1259,10 +1284,17 @@ function updateHUD() {
     buildChips(document.getElementById('chips' + side), g);
   }
 
-  document.getElementById('sbSeries').textContent = T('sb.series', { n: SERIES_GAMES });
-  document.getElementById('scoreL').textContent = matchScore[oppTeam];
-  document.getElementById('scoreR').textContent = matchScore[myTeam];
-  buildDashes(oppTeam, myTeam);
+  if (seriesOn()) {
+    document.getElementById('sbSeries').textContent = T('sb.series', { n: SERIES_GAMES });
+    document.getElementById('scoreL').textContent = matchScore[oppTeam];
+    document.getElementById('scoreR').textContent = matchScore[myTeam];
+    buildDashes(oppTeam, myTeam);
+  } else {
+    document.getElementById('sbSeries').textContent = T('sb.single');
+    document.getElementById('scoreL').textContent = '';
+    document.getElementById('scoreR').textContent = '';
+    const dl = document.getElementById('dashes'); if (dl) dl.innerHTML = '';
+  }
 
   document.getElementById('turnPill').classList.toggle('mine', currentTurn === myNo && !game.gameOver);
   document.getElementById('statusText').textContent = bannerText();
@@ -1296,8 +1328,11 @@ function startGame() {
 function showEnd() {
   exitLock(); // libera o cursor na hora (pra clicar no overlay de fim de jogo)
   // Conta a vitória na série (determinístico → todos os lados incrementam igual).
-  matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
-  matchOver = matchScore[game.winner] >= SERIES_TARGET;
+  // Partida ÚNICA (bot/ranqueado/sala com série desligada): sem placar de série.
+  if (seriesOn()) {
+    matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
+    matchOver = matchScore[game.winner] >= SERIES_TARGET;
+  } else matchOver = false;
   const won = game.winner === teamOf(myNo); // vitória do SEU time (1v1: você)
   if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
   endWon = won;
@@ -1312,6 +1347,23 @@ let endWon = false;
 function renderEndTexts() {
   const who = roomSlots === 4 ? 'team' : 'you'; // conjugação correta por idioma
   const el = document.getElementById('endTitle'), m = document.getElementById('endMsg'), btn = document.getElementById('rematchBtn');
+  if (rankedMode) {
+    el.textContent = T(endWon ? 'end.wonGame.you' : 'end.lostGame.you');
+    let extra = '';
+    if (rankedResult && rankedResult.elo && typeof rankedResult.elo.delta === 'number') {
+      const dd = Math.round(rankedResult.elo.delta);
+      extra = ' ' + T('rk.eloDelta', { delta: (endWon ? '+' : '\u2212') + dd });
+    }
+    m.textContent = (game.lastMsg || '') + extra;
+    btn.textContent = T('rk.again');
+    return;
+  }
+  if (!seriesOn()) { // partida única (bot ou sala sem série)
+    el.textContent = T((endWon ? 'end.wonGame.' : 'end.lostGame.') + who);
+    m.textContent = game.lastMsg || '';
+    btn.textContent = T('btn.playAgain');
+    return;
+  }
   if (matchOver) {
     el.textContent = T((endWon ? 'end.wonSeries.' : 'end.lostSeries.') + who);
     m.textContent = T('end.finalScore', { a: matchScore[1], b: matchScore[2] }) + ' ' + game.lastMsg;
@@ -1323,6 +1375,7 @@ function renderEndTexts() {
   }
 }
 function doRematch(initiator) {
+  if (rankedMode) { rankedRequeue(); return; } // ranqueado: nova busca na fila
   if (matchOver) { matchScore = { 1: 0, 2: 0 }; matchOver = false; } // fim da série → zera para a próxima
   currentTurn = TURN_ORDER[0]; if (!botLevel && initiator) send({ t: 'rematch' }); startGame();
 }
@@ -1332,6 +1385,9 @@ function doRematch(initiator) {
 // ===========================================================================
 // Lê o nome; se vazio, avisa e destaca o campo (nome é obrigatório p/ jogar).
 function getNameOrWarn() {
+  // Logado: o nome vem da CONTA (o campo de apelido nem aparece).
+  const u = window.OrbitAuth && OrbitAuth.user();
+  if (u && u.displayName) return u.displayName.slice(0, 20);
   const v = (document.getElementById('name').value || '').trim().slice(0, 20);
   if (!v) {
     setLobbyMsg(T('lm.nameRequired'));
@@ -1542,7 +1598,7 @@ function init() {
   canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onTouchMove(e); }, { passive: false });
   canvas.addEventListener('touchend', (e) => { e.preventDefault(); onTouchEnd(e); }, { passive: false });
 
-  const lockInputs = () => { ['createBtn', 'createBtn2', 'joinBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = true; }); };
+  const lockInputs = () => { ['createBtn', 'createBtn2', 'joinBtn', 'rankedBtn', 'rkGuestBtn', 'rkLoginBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = true; }); };
   document.getElementById('name').addEventListener('input', () => { document.getElementById('name').classList.remove('err'); setLobbyMsg(''); });
 
   // ---- Preferências persistidas no navegador (voltam na próxima visita) ----
@@ -1570,12 +1626,150 @@ function init() {
     if (window.OrbitAudio) OrbitAudio.unlock();
     const nm = getNameOrWarn(); if (!nm) return;
     botLevel = null; myName = nm; iAmHost = true; roomSlots = slots; // PvP
-    teamSel = {}; lobbyRoster = []; roomGuide = true;
+    teamSel = {}; lobbyRoster = []; roomGuide = true; roomSeries = true;
     roomInput = OrbitNet.makeCode();
     lockInputs();
     setLobbyMsg(slots === 4 ? T('lm.created4') : T('lm.created2'));
     hostRoom(slots);
   };
+  // ---- ABAS do menu (Jogar / Ranqueada / Treino) ---------------------------
+  const TABS = { tabPlay: 'panelPlay', tabRanked: 'panelRanked', tabBot: 'panelBot' };
+  for (const [btnId, panelId] of Object.entries(TABS)) {
+    const b = document.getElementById(btnId);
+    if (b) b.addEventListener('click', () => {
+      for (const [bi, pi] of Object.entries(TABS)) {
+        document.getElementById(bi).classList.toggle('sel', bi === btnId);
+        document.getElementById(pi).classList.toggle('hidden', pi !== panelId);
+      }
+    });
+  }
+
+  // ---- CONTA: reflete o estado de login na UI ------------------------------
+  const authUI = (u) => {
+    const logged = !!u;
+    document.getElementById('acctLogged').classList.toggle('hidden', !logged);
+    document.getElementById('acctGuest').classList.toggle('hidden', logged);
+    document.getElementById('nickBlock').style.display = logged ? 'none' : '';
+    // painel ranqueado: cadeado p/ deslogado, fila p/ logado
+    document.getElementById('rkLockBox').style.display = logged ? 'none' : '';
+    document.getElementById('rkLoginBtn').classList.toggle('hidden', logged);
+    document.getElementById('rkGuestBtn').classList.toggle('hidden', logged);
+    document.getElementById('rankedBtn').classList.toggle('hidden', !logged);
+    if (!logged) return;
+    const nm = u.displayName || (u.email ? u.email.split('@')[0] : T('default.you'));
+    document.getElementById('acctName').textContent = nm + (u.isAnonymous ? ' 🎭' : '');
+    document.getElementById('acctInitial').textContent = (nm.trim().charAt(0) || '?').toUpperCase();
+    document.getElementById('acctElo').textContent = T('acct.loggedNoElo');
+    if (window.OrbitRanked && OrbitRanked.me) OrbitRanked.me().then((me) => {
+      if (me && typeof me.elo === 'number') document.getElementById('acctElo').textContent = T('acct.logged', { elo: Math.round(me.elo) });
+    }).catch(() => {});
+  };
+  if (window.OrbitAuth) OrbitAuth.onChange(authUI);
+
+  // ---- MODAL de login (e-mail/senha, criar conta, Google) ------------------
+  let authMode = 'signin'; // signin | signup
+  const authModalEl = document.getElementById('authModal');
+  const authErrEl = document.getElementById('authErr');
+  const setAuthMode = (m) => {
+    authMode = m;
+    document.getElementById('authNameRow').classList.toggle('hidden', m !== 'signup');
+    document.getElementById('authSubmitTxt').textContent = T(m === 'signup' ? 'auth.signup' : 'auth.signin');
+    document.getElementById('authSwapTxt').textContent = T(m === 'signup' ? 'auth.haveAccount' : 'auth.noAccount');
+    document.getElementById('authSwapLink').textContent = T(m === 'signup' ? 'auth.toSignin' : 'auth.create');
+    document.getElementById('authPass').setAttribute('autocomplete', m === 'signup' ? 'new-password' : 'current-password');
+    authErrEl.textContent = '';
+  };
+  const openAuth = () => { setAuthMode('signin'); authModalEl.classList.remove('hidden'); document.getElementById('authEmail').focus(); };
+  const closeAuth = () => authModalEl.classList.add('hidden');
+  document.getElementById('authClose').addEventListener('click', closeAuth);
+  authModalEl.addEventListener('click', (e) => { if (e.target === authModalEl) closeAuth(); });
+  document.getElementById('authSwapLink').addEventListener('click', (e) => { e.preventDefault(); setAuthMode(authMode === 'signup' ? 'signin' : 'signup'); });
+  const authBusy = (on) => { ['authSubmit', 'authGoogle'].forEach((id) => { document.getElementById(id).disabled = on; }); };
+  document.getElementById('authSubmit').addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value;
+    const pass = document.getElementById('authPass').value;
+    const nome = document.getElementById('authName').value;
+    if (authMode === 'signup' && !(nome || '').trim()) { authErrEl.textContent = T('auth.err.needName'); return; }
+    authErrEl.textContent = ''; authBusy(true);
+    try {
+      if (authMode === 'signup') await OrbitAuth.signUpEmail(nome, email, pass);
+      else await OrbitAuth.signInEmail(email, pass);
+      closeAuth();
+    } catch (e) { authErrEl.textContent = T(OrbitAuth.errKey(e)); }
+    authBusy(false);
+  });
+  document.getElementById('authGoogle').addEventListener('click', async () => {
+    authErrEl.textContent = ''; authBusy(true);
+    try { await OrbitAuth.signInGoogle(); closeAuth(); }
+    catch (e) { authErrEl.textContent = T(OrbitAuth.errKey(e)); }
+    authBusy(false);
+  });
+  document.getElementById('loginBtn').addEventListener('click', openAuth);
+  document.getElementById('rkLoginBtn').addEventListener('click', openAuth);
+  document.getElementById('logoutBtn').addEventListener('click', () => { if (window.OrbitAuth) OrbitAuth.signOut(); });
+
+  // ---- RANQUEADO: busca partida com identidade verificada -----------------
+  const startRanked = () => {
+    if (window.OrbitAudio) OrbitAudio.unlock();
+    const nm = getNameOrWarn(); if (!nm) return;
+    if (!window.OrbitRanked) { setLobbyMsg(T('rk.connFail')); return; }
+    botLevel = null; myName = nm; iAmHost = false; roomSlots = 2;
+    OrbitRanked.getToken(nm).then((tok) => {
+      if (!tok) { openAuth(); return; }
+      lockInputs();
+      setLobbyMsg(T('rk.searching'));
+      OrbitNet.playRanked(tok, nm, handleNet);
+    });
+  };
+  const rkGuest = document.getElementById('rkGuestBtn');
+  if (rkGuest) rkGuest.addEventListener('click', async () => {
+    if (window.OrbitAudio) OrbitAudio.unlock();
+    const nm = getNameOrWarn(); if (!nm) return; // convidado precisa do apelido
+    try { await OrbitAuth.signInGuest(nm); startRanked(); }
+    catch (e) { setLobbyMsg(T(OrbitAuth.errKey(e))); }
+  });
+  window.rankedRequeue = () => { // "jogar de novo" do fim de partida ranqueada
+    document.getElementById('endOverlay').classList.add('hidden');
+    try { OrbitNet.leave(); } catch (e) {}
+    abandonRoom('');
+    startRanked();
+  };
+  const rkB = document.getElementById('rankedBtn');
+  if (rkB) rkB.addEventListener('click', startRanked);
+
+  // ---- Leaderboard da temporada (modal) ------------------------------------
+  const lbModal = document.getElementById('lbModal');
+  const lbClose = () => lbModal && lbModal.classList.add('hidden');
+  const lbCloseBtn = document.getElementById('lbCloseBtn');
+  if (lbCloseBtn) lbCloseBtn.addEventListener('click', lbClose);
+  if (lbModal) lbModal.addEventListener('click', (e) => { if (e.target === lbModal) lbClose(); }); // clique fora fecha
+  const lbB = document.getElementById('lbBtn');
+  if (lbB) lbB.addEventListener('click', () => {
+    const list = document.getElementById('lbList'), season = document.getElementById('lbSeason');
+    if (!lbModal || !list) return;
+    lbModal.classList.remove('hidden');
+    season.textContent = '';
+    list.innerHTML = '<div class="lbEmpty">…</div>';
+    if (!window.OrbitRanked) { list.innerHTML = ''; list.textContent = T('rk.connFail'); return; }
+    OrbitRanked.leaderboard(20).then((data) => {
+      season.textContent = T('lb.title', { season: data.season });
+      list.textContent = '';
+      if (!data.players.length) {
+        const e = document.createElement('div'); e.className = 'lbEmpty';
+        e.textContent = T('lb.empty'); list.appendChild(e); return;
+      }
+      data.players.forEach((pl, i) => {
+        const row = document.createElement('div'); row.className = 'lbRow';
+        const mk = (cls, txt) => { const s = document.createElement('span'); s.className = cls; s.textContent = txt; row.appendChild(s); };
+        mk('pos', (i + 1) + '.');
+        mk('nm', pl.name);
+        mk('elo', String(Math.round(pl.elo)));
+        mk('wl', T('lb.wl', { w: pl.wins, l: pl.losses }));
+        list.appendChild(row);
+      });
+    }).catch(() => { list.textContent = T('rk.connFail'); });
+  });
+
   document.getElementById('createBtn').addEventListener('click', () => createRoom(2));
   const c2 = document.getElementById('createBtn2');
   if (c2) c2.addEventListener('click', () => createRoom(4));

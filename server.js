@@ -12,7 +12,8 @@ const fs = require('fs');
 const path = require('path');
 
 const PORT = process.env.PORT || 3000;
-const PUBLIC_DIR = path.resolve(__dirname, process.env.PUBLIC_DIR || 'public');
+const dirArg = (process.argv.find((a) => a.startsWith('--dir=')) || '').slice(6);
+const PUBLIC_DIR = path.resolve(__dirname, dirArg || process.env.PUBLIC_DIR || 'public');
 const WS_GUID = '258EAFA5-E914-47DA-95CA-C5AB0DC85B11';
 
 const MIME = {
