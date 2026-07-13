@@ -1669,8 +1669,11 @@ function init() {
     if (!window.OrbitRanked || !OrbitRanked.me) return;
     OrbitRanked.me().then((me) => {
       if (!me) return;
-      if (typeof me.elo === 'number') document.getElementById('acctElo').textContent = T('acct.logged', { elo: Math.round(me.elo) });
-      document.getElementById('rkStatElo').textContent = Math.round(me.elo);
+      // ELO só aparece depois da PRIMEIRA ranqueada (1000 é o valor-base de
+      // todo mundo — mostrar antes de jogar só confunde).
+      document.getElementById('acctElo').textContent = me.placed
+        ? T('acct.logged', { elo: Math.round(me.elo) }) : T('acct.loggedNoElo');
+      document.getElementById('rkStatElo').textContent = me.placed ? Math.round(me.elo) : '—';
       document.getElementById('rkStatPos').textContent = me.placed && me.rank ? '#' + me.rank + '/' + me.total : '—';
       document.getElementById('rkStatRec').textContent = me.placed ? me.wins + ' · ' + me.losses : T('rk.unplaced');
     }).catch(() => {});
