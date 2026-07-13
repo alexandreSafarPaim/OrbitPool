@@ -1590,6 +1590,24 @@ function init() {
   loadEnvironment(); // fundo 360° do bar (se houver arquivo em env/)
   camPos.set(0, 780, 900); camLook.set(0, 0, 0);
   if (window.OrbitAds) OrbitAds.ready(); // portal: fim do loading (loadingStop)
+  // SITE: link de convite ?room=CODIGO → auto-join (sem SDK; funciona em
+  // qualquer lugar). No portal o fluxo equivalente usa o SDK logo abaixo.
+  if (!window.OrbitPortalGame) {
+    const roomParam = new URLSearchParams(location.search).get('room');
+    if (roomParam) {
+      const code = roomParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+      if (code.length >= 3) {
+        document.getElementById('joinCode').value = code;
+        const nickEl = document.getElementById('name');
+        const acct = window.OrbitAuth && OrbitAuth.user && OrbitAuth.user();
+        if ((acct && acct.displayName) || (nickEl.value || '').trim()) {
+          document.getElementById('joinBtn').click(); // nome ok → entra direto
+        } else {
+          setLobbyMsg(T('lm.nameRequired')); nickEl.focus(); // só falta o apelido
+        }
+      }
+    }
+  }
   // Portal: entrou por link de convite → auto-join; instant multiplayer →
   // cria a sala 1v1 direto (o líder da party compartilha pelo botão do site).
   if (window.OrbitPortalGame) (async () => {
@@ -1833,8 +1851,9 @@ function init() {
     lockInputs();
     setLobbyMsg(T('lm.connectingRoom', { code: code })); joinRoom();
   });
+  const inviteURL = (code) => location.origin + location.pathname + '?room=' + encodeURIComponent(code);
   document.getElementById('copyCodeBtn').addEventListener('click', () => {
-    const code = document.getElementById('roomCodeVal').textContent;
+    const code = inviteURL(document.getElementById('roomCodeVal').textContent);
     const btn = document.getElementById('copyCodeBtn');
     const done = () => { btn.textContent = T('btn.copied'); setTimeout(() => { btn.textContent = T('btn.copy'); }, 1500); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done).catch(done);
@@ -1847,7 +1866,7 @@ function init() {
   const rtEl = document.getElementById('roomTag');
   if (rtEl) rtEl.addEventListener('click', () => {
     const done = () => { setStatus('Código ' + roomInput + ' copiado!'); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(roomInput).then(done).catch(done);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(inviteURL(roomInput)).then(done).catch(done);
     else done();
   });
 
