@@ -14,7 +14,7 @@ const VERSION = 'orbitpool-v3';
 const SHELL = [
   './',
   'index.html',
-  'rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'audio.js', 'menu.js', 'i18n.js',
+  'rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'auth.js', 'audio.js', 'menu.js', 'i18n.js',
   'table3d_collider.js', 'GLTFLoader.js', 'OBJLoader.js',
   'favicon.svg', 'icon-192.png', 'icon-512.png', 'site.webmanifest',
 ];

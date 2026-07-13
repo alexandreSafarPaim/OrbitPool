@@ -108,7 +108,74 @@
         repeating-linear-gradient(90deg, transparent 0 63px, rgba(0,0,0,.22) 63px 65px),
         linear-gradient(135deg, #1b3a2e 0%, #14322a 40%, #10241f 100%); }
     .overlay.hidden { display: none; }
-    #teamLobby, #endOverlay, #gpuModal, #lbModal { background: rgba(6,10,8,.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    #teamLobby, #endOverlay, #gpuModal, #lbModal, #authModal { background: rgba(6,10,8,.6); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); }
+    /* ---- linha de conta / abas / painéis do menu ---- */
+    .acctRow { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 4px;
+      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.12); border-radius: 12px; }
+    #acctLogged { background: rgba(255,210,74,.07); border-color: rgba(255,210,74,.28); }
+    .acctRow.hidden { display: none; }
+    .acctAv { width: 38px; height: 38px; border-radius: 50%; flex: none;
+      background: radial-gradient(circle at 34% 28%, #ffd980, #e6851a 70%);
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Permanent Marker', cursive; font-size: 17px; color: #3a1e05;
+      box-shadow: inset -1px -2px 3px rgba(0,0,0,.4); }
+    .acctAvGuest { background: rgba(255,255,255,.08); font-size: 18px; box-shadow: none; }
+    .acctInfo { flex: 1; min-width: 0; line-height: 1.2; }
+    .acctName { font-size: 15px; font-weight: 600; color: #f3ecdb;
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .acctSub { font-size: 12px; color: #8fe3ff; }
+    #acctGuest .acctSub { color: #b7a988; }
+    .acctBtn { flex: none; padding: 8px 14px; font-family: 'Permanent Marker', cursive; font-size: 13px;
+      color: var(--ink); background: linear-gradient(180deg, var(--accent), #e69a1a);
+      border: none; border-radius: 9px; cursor: pointer; box-shadow: 0 3px 0 #a86a10; }
+    .acctOut { color: #ff8f6b; background: rgba(255,255,255,.06); border: 1px solid rgba(255,143,107,.35); box-shadow: none; }
+    .tabRow { display: flex; gap: 6px; padding: 5px; margin-top: 14px;
+      background: rgba(0,0,0,.32); border: 1px solid rgba(255,255,255,.08); border-radius: 13px; }
+    .tabBtn { flex: 1; padding: 9px 4px; font-family: 'Permanent Marker', cursive; font-size: 13px;
+      color: #cbb892; background: transparent; border: none; border-radius: 9px; cursor: pointer; transition: .15s; }
+    .tabBtn:hover { color: #fff; background: rgba(255,255,255,.07); }
+    .tabBtn.sel { color: var(--ink); background: linear-gradient(180deg, var(--accent), #e69a1a); box-shadow: 0 2px 0 #a86a10; }
+    .menuPanel { margin-top: 14px; animation: tabIn .18s ease; }
+    .menuPanel.hidden { display: none; }
+    @keyframes tabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .rkLock { display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+      background: rgba(255,210,74,.08); border: 1.5px dashed rgba(255,210,74,.4); border-radius: 12px; }
+    .rkLockIco { font-size: 22px; }
+    .rkLockT { font-family: 'Permanent Marker', cursive; font-size: 14px; color: var(--accent); }
+    .rkLockS { font-size: 13px; color: #d8cbb2; }
+    .ctaBtn { display: block; width: 100%; margin-top: 12px; padding: 14px;
+      font-family: 'Permanent Marker', cursive; font-size: 17px; color: var(--ink);
+      background: linear-gradient(180deg, var(--accent), #e69a1a); border: none; border-radius: 12px;
+      cursor: pointer; box-shadow: 0 5px 0 #a86a10, 0 9px 20px rgba(0,0,0,.4); transition: .12s; }
+    .ctaBtn:hover { transform: translateY(2px); box-shadow: 0 3px 0 #a86a10, 0 6px 14px rgba(0,0,0,.35); }
+    .ghostFull { display: block; width: 100%; margin-top: 10px; padding: 12px;
+      font-family: 'Permanent Marker', cursive; font-size: 14px; color: #e8d9b5;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.2); border-radius: 11px;
+      cursor: pointer; transition: .15s; }
+    .ghostFull:hover { background: rgba(255,255,255,.12); border-color: rgba(255,255,255,.3); }
+    .hidden.ctaBtn, .ctaBtn.hidden, .ghostFull.hidden { display: none; }
+    /* ---- modal de login ----
+       Regras com .authPanel na frente para VENCER o genérico `.panel button`
+       (mesmo peso de classe+elemento não bastava — o × virava botão amarelo). */
+    .authPanel { position: relative; text-align: left; }
+    .authPanel h2, .authPanel .authTag { text-align: center; }
+    .authPanel .fieldLbl { text-align: left; margin-top: 14px; }
+    #authNameRow.hidden { display: none; }
+    .authPanel button.authX { position: absolute; top: 12px; right: 14px; width: 30px; height: 30px;
+      margin: 0; padding: 0; border-radius: 50%; font-family: inherit; font-size: 16px; line-height: 1;
+      background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.16); color: #e8d9b5;
+      box-shadow: none; cursor: pointer; }
+    .authPanel button.authX:hover { transform: none; background: rgba(255,255,255,.16); box-shadow: none; }
+    .authPanel button.ghostFull { font-size: 14px; color: #e8d9b5; padding: 12px;
+      background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.2); box-shadow: none; }
+    .authPanel button.ghostFull:hover { transform: none; background: rgba(255,255,255,.12); box-shadow: none; }
+    .authPanel button:disabled { opacity: .55; cursor: default; }
+    .authIn { width: 100%; padding: 12px 14px; font-size: 16px; color: #fff;
+      background: rgba(255,255,255,.06); border: 1.5px solid rgba(255,255,255,.2); border-radius: 11px; transition: .15s; }
+    .authIn:focus { outline: none; border-color: var(--accent); }
+    .authErr { min-height: 17px; margin: 10px 0 0; font-size: 13px; color: #ff8f6b; text-align: center; }
+    .authSwap { margin-top: 12px; font-size: 13px; color: #b7a988; text-align: center; }
+    .authSwap a { color: var(--accent); }
     .panel { position: relative; padding: 30px 30px 26px; width: min(92vw, 420px); text-align: center;
       border-radius: 14px; border: 9px solid transparent;
       background:
@@ -768,44 +835,80 @@
           <p class="cardSub" data-i18n="card.sub">— hoje tem sinuca —</p>
           <div class="chalkline"></div>
 
-          <label class="fieldLbl" for="name" data-i18n="field.nick">seu apelido</label>
-          <input id="name" maxlength="20" placeholder="Ex: Zé da Tacada" data-i18n-ph="nick.ph" />
-
-          <label class="fieldLbl" data-i18n="field.open">abrir a mesa</label>
-          <div class="createRow">
-            <button id="createBtn" class="btnMode">
-              <span class="bmTitle">🎱 1v1</span>
-              <span class="bmSub" data-i18n="mode.1v1">partida clássica</span>
-            </button>
-            <button id="createBtn2" class="btnMode">
-              <span class="bmTitle">🤝 2v2</span>
-              <span class="bmSub" data-i18n="mode.2v2">duplas · 4 jogadores</span>
-            </button>
+          <!-- linha de conta (logado) -->
+          <div id="acctLogged" class="acctRow hidden">
+            <div class="acctAv" id="acctInitial">?</div>
+            <div class="acctInfo">
+              <div class="acctName" id="acctName"></div>
+              <div class="acctSub" id="acctElo"></div>
+            </div>
+            <button id="logoutBtn" class="acctBtn acctOut">🚪 <span data-i18n="acct.logout">Sair</span></button>
+          </div>
+          <!-- linha de conta (convidado) -->
+          <div id="acctGuest" class="acctRow">
+            <div class="acctAv acctAvGuest">👤</div>
+            <div class="acctInfo">
+              <div class="acctName" data-i18n="acct.guestTitle">Jogando como convidado</div>
+              <div class="acctSub" data-i18n="acct.guestSub">entre pra salvar ELO e stats</div>
+            </div>
+            <button id="loginBtn" class="acctBtn" data-i18n="acct.login">Entrar</button>
           </div>
 
-          <div class="orSep"><span data-i18n="or.join">ou entra na dos amigos</span></div>
-          <div class="joinRow">
-            <input id="joinCode" maxlength="8" placeholder="K7QX" autocapitalize="characters" />
-            <button id="joinBtn" class="btnJoin" data-i18n="btn.join">Entrar</button>
+          <!-- apelido (só convidado — logado usa o nome da conta) -->
+          <div id="nickBlock">
+            <label class="fieldLbl" for="name" data-i18n="field.nick">seu apelido</label>
+            <input id="name" maxlength="20" placeholder="Ex: Zé da Tacada" data-i18n-ph="nick.ph" />
           </div>
 
-          <div class="orSep"><span data-i18n="or.ranked">ou joga valendo ranking</span></div>
-          <div class="createRow">
-            <button id="rankedBtn" class="btnMode">
-              <span class="bmTitle">🏆 <span data-i18n="mode.ranked">Ranqueado</span></span>
-              <span class="bmSub" data-i18n="mode.rankedSub">1v1 online · vale ELO</span>
-            </button>
-            <button id="lbBtn" class="btnMode">
-              <span class="bmTitle">📋 <span data-i18n="mode.lb">Ranking</span></span>
-              <span class="bmSub" data-i18n="mode.lbSub">top da temporada</span>
-            </button>
+          <!-- abas -->
+          <div class="tabRow">
+            <button id="tabPlay" class="tabBtn sel">🎱 <span data-i18n="tab.play">Jogar</span></button>
+            <button id="tabRanked" class="tabBtn">🏆 <span data-i18n="tab.ranked">Ranqueada</span></button>
+            <button id="tabBot" class="tabBtn">🤖 <span data-i18n="tab.bot">Treino</span></button>
           </div>
-          <div class="orSep"><span data-i18n="or.bot">ou treina com o bot</span></div>
+
+          <!-- painel: jogar com amigos -->
+          <div id="panelPlay" class="menuPanel">
+            <div class="createRow">
+              <button id="createBtn" class="btnMode">
+                <span class="bmTitle">🎱 1v1</span>
+                <span class="bmSub" data-i18n="mode.1v1">partida clássica</span>
+              </button>
+              <button id="createBtn2" class="btnMode">
+                <span class="bmTitle">🤝 2v2</span>
+                <span class="bmSub" data-i18n="mode.2v2">duplas · 4 jogadores</span>
+              </button>
+            </div>
+            <div class="orSep"><span data-i18n="or.code">ou entra por código</span></div>
+            <div class="joinRow">
+              <input id="joinCode" maxlength="8" placeholder="K7QX" autocapitalize="characters" />
+              <button id="joinBtn" class="btnJoin" data-i18n="btn.join">Entrar</button>
+            </div>
+          </div>
+
+          <!-- painel: ranqueada -->
+          <div id="panelRanked" class="menuPanel hidden">
+            <div id="rkLockBox" class="rkLock">
+              <span class="rkLockIco">🔒</span>
+              <div>
+                <div class="rkLockT" data-i18n="rk.lockTitle">precisa se identificar</div>
+                <div class="rkLockS" data-i18n="rk.lockSub">a ranqueada vale ELO — entre na conta ou jogue como convidado.</div>
+              </div>
+            </div>
+            <button id="rkLoginBtn" class="ctaBtn">🔑 <span data-i18n="rk.loginCta">Entrar pra jogar ranqueada</span></button>
+            <button id="rkGuestBtn" class="ghostFull">🎭 <span data-i18n="rk.guestCta">Jogar ranqueada como convidado</span></button>
+            <button id="rankedBtn" class="ctaBtn hidden">🏆 <span data-i18n="rk.queueCta">Entrar na fila 1v1 · vale ELO</span></button>
+            <button id="lbBtn" class="ghostFull">📋 <span data-i18n="rk.lbCta">Ver ranking da temporada</span></button>
+          </div>
+
+          <!-- painel: treino -->
+          <div id="panelBot" class="menuPanel hidden">
           <div class="botRow">
             <button class="botLvl" data-lvl="iniciante" data-i18n="bot.beginner">Iniciante</button>
             <button class="botLvl" data-lvl="amador" data-i18n="bot.amateur">Amador</button>
             <button class="botLvl" data-lvl="pro" data-i18n="bot.pro">Pro</button>
             <button class="botLvl mine" data-lvl="mineirinho" data-i18n="bot.goat">🐐 Mineirinho de Araxá</button>
+          </div>
           </div>
 
           <p id="lobbyMsg" class="msg"></p>
@@ -848,6 +951,11 @@
       <div class="tlCfg">
         <div class="tlCfgHead">⚙ configurações da sala</div>
         <label class="tlSwitch">
+          <input type="checkbox" id="tlSeries" checked>
+          <span class="tlKnob"></span>
+          <span class="tlSwLbl" data-i18n="tl.series">série melhor de 3</span>
+        </label>
+        <label class="tlSwitch">
           <input type="checkbox" id="tlGuide" checked>
           <span class="tlKnob"></span>
           <span class="tlSwLbl">habilitar linha guia</span>
@@ -865,6 +973,27 @@
   </div>
 
   <!-- aviso de aceleração gráfica desativada (WebGL por software) -->
+  <div id="authModal" class="overlay hidden" style="z-index:41">
+    <div class="panel authPanel">
+      <button id="authClose" class="authX" aria-label="fechar">×</button>
+      <h2 data-i18n="auth.title2">Entrar na conta</h2>
+      <p class="sub authTag" data-i18n="auth.tag">— pra jogar valendo ELO —</p>
+      <div id="authNameRow" class="hidden">
+        <label class="fieldLbl" for="authName" data-i18n="auth.name">nome</label>
+        <input id="authName" class="authIn" maxlength="20" autocomplete="nickname" />
+      </div>
+      <label class="fieldLbl" for="authEmail" data-i18n="auth.email">e-mail</label>
+      <input id="authEmail" class="authIn" type="email" placeholder="voce@email.com" autocomplete="email" />
+      <label class="fieldLbl" for="authPass" data-i18n="auth.pass">senha</label>
+      <input id="authPass" class="authIn" type="password" placeholder="••••••••" autocomplete="current-password" />
+      <p id="authErr" class="authErr"></p>
+      <button id="authSubmit" class="ctaBtn">🔑 <span id="authSubmitTxt" data-i18n="auth.signin">Entrar</span></button>
+      <p class="authSwap"><span id="authSwapTxt" data-i18n="auth.noAccount">não tem conta?</span> <a href="#" id="authSwapLink" data-i18n="auth.create">criar rapidinho</a></p>
+      <div class="orSep"><span data-i18n="auth.or">ou</span></div>
+      <button id="authGoogle" class="ghostFull" data-i18n="auth.google">Entrar com Google</button>
+    </div>
+  </div>
+
   <div id="lbModal" class="overlay hidden" style="z-index:40">
     <div class="panel">
       <h2>📋 <span data-i18n="mode.lb">Ranking</span></h2>
@@ -979,6 +1108,7 @@
             loadScript('physics.js', function () {
               loadScript('audio.js', function () {
                 loadScript('menu.js', function () {
+                  loadScript('auth.js', function () {
                   loadScript('ranked.js', function () {
                   loadScript('net.js', function () {
                     loadScript('bot.js', function () {
@@ -987,6 +1117,7 @@
                     }, function () { fail(T('err.file', { file: 'bot.js' })); });
                   }, function () { fail(T('err.file', { file: 'net.js' })); });
                   }, function () { fail(T('err.file', { file: 'ranked.js' })); });
+                  }, function () { fail(T('err.file', { file: 'auth.js' })); });
                 }, function () { fail(T('err.file', { file: 'menu.js' })); });
               }, function () { fail(T('err.file', { file: 'audio.js' })); });
             }, function () { fail(T('err.file', { file: 'physics.js' })); });

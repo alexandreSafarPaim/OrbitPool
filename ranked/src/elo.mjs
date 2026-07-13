@@ -69,6 +69,12 @@ export async function recordResult(db, winner, loser, reason = 'game') {
   return { winnerElo: wElo + delta, loserElo: Math.max(0, lElo - delta), delta, factor };
 }
 
+export async function getStats(db, id) {
+  const season = currentSeason();
+  return db.prepare('SELECT name, elo, wins, losses FROM players WHERE id = ? AND season = ?')
+    .bind(id, season).first();
+}
+
 export async function leaderboard(db, limit = 50) {
   const season = currentSeason();
   const rs = await db.prepare(

@@ -17,11 +17,12 @@ window.OrbitRanked = {
   wsBase() { return this.base.replace(/^http/, 'ws'); },
 
   async getToken(name) {
-    // Provedor real (Firebase no site / CrazyGames no portal) — fase 3.
+    // Provedor real: Firebase no site (a UI de login fica no menu) /
+    // SDK do CrazyGames no portal. Sem sessão → null (o menu abre o modal).
     if (window.OrbitAuth && OrbitAuth.getToken) {
       try { return await OrbitAuth.getToken(); } catch (e) { return null; }
     }
-    // Desenvolvimento local: token dev (rejeitado em produção).
+    // Sem OrbitAuth (falha de CDN) em ambiente local: token dev p/ testes.
     if (/^(localhost|127\.|192\.168\.|10\.)/.test(location.hostname)) {
       let id; // por ABA (sessionStorage): duas abas = dois jogadores no teste
       try {
@@ -33,6 +34,14 @@ window.OrbitRanked = {
       return 'dev.' + b64u;
     }
     return null;
+  },
+
+  async me() {
+    const t = await this.getToken();
+    if (!t) return null;
+    const r = await fetch(this.base + '/api/me', { headers: { Authorization: 'Bearer ' + t } });
+    if (!r.ok) throw new Error('me http ' + r.status);
+    return r.json();
   },
 
   async leaderboard(limit) {

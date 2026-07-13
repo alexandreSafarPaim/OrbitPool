@@ -56,7 +56,10 @@ const game = { open: true, groups: { 1: null, 2: null }, gameOver: false, winner
 // Série melhor-de-5 (primeiro a 3 vitórias vence o match). Placar sincronizado
 // sem rede extra: os dois lados calculam o vencedor de cada partida de forma
 // idêntica (mesma timeline determinística), então incrementam igual.
-const SERIES_GAMES = 5, SERIES_TARGET = 3;
+const SERIES_GAMES = 3, SERIES_TARGET = 2; // melhor de 3 (primeiro a 2)
+let roomSeries = true; // config da sala (host): série ligada? (default sim)
+// Série só existe em sala 1v1/2v2 com a opção ligada — bot e ranqueado são únicas.
+const seriesOn = () => !botLevel && !rankedMode && roomSeries;
 // ---- Ranqueado (servidor autoritativo): flags e estado vindos do Worker ----
 let rankedMode = false;   // partida atual é ranqueada?
 let rankedState = null;   // 'state' autoritativo anexado ao último 'shot'
@@ -603,8 +606,9 @@ function handleNet(msg) {
       teamSel = msg.sel || {};
       renderTeamLobby();
       break;
-    case 'roomcfg': // host mudou configurações da sala (linha guia etc.)
+    case 'roomcfg': // host mudou configurações da sala (linha guia, série etc.)
       roomGuide = msg.guide !== false;
+      roomSeries = msg.series !== false;
       if (phase === 'lobby') renderTeamLobby();
       break;
     case 'start': applyStart(msg); break;
@@ -673,12 +677,13 @@ function sendResync(no) {
     t: 'resync', for: no,
     players, order: TURN_ORDER, slots: roomSlots,
     game: { open: game.open, groups: game.groups, gameOver: game.gameOver, winner: game.winner },
-    matchScore, matchOver, currentTurn, ballInHand, guide: roomGuide,
+    matchScore, matchOver, currentTurn, ballInHand, guide: roomGuide, series: roomSeries,
     balls: balls.map((b) => ({ n: b.n, x: b.x, y: b.y, potted: b.potted })),
   });
 }
 function applyResync(msg) {
   roomGuide = msg.guide !== false;
+  roomSeries = msg.series !== false;
   players = msg.players || players;
   TURN_ORDER = (msg.order || [1, 2]).slice();
   roomSlots = msg.slots || 2;
@@ -707,6 +712,7 @@ function applyStart(msg) {
   rankedElo = msg.elo || null;
   if (rankedMode && OrbitNet.markStarted) OrbitNet.markStarted(); // liga a reconexão
   roomGuide = msg.guide !== false; // config da sala (default: ligada)
+  roomSeries = msg.series !== false;
   if (msg.players && msg.order) { // host montou a sala (1v1 ou 2v2)
     players = msg.players; TURN_ORDER = msg.order.slice(); roomSlots = msg.slots || (msg.order.length === 4 ? 4 : 2);
   } else { // 1v1: monta o roster local a partir do nome do adversário
@@ -732,10 +738,10 @@ function applyStart(msg) {
 // conexão (OrbitNet.leave), esconde o lobby da sala e destrava os botões.
 function abandonRoom(msgText) {
   try { if (OrbitNet.leave) OrbitNet.leave(); } catch (e) {}
-  myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true;
+  myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true; roomSeries = true;
   const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
   const rs = document.getElementById('roomShare'); if (rs) rs.hidden = true;
-  ['createBtn', 'createBtn2', 'joinBtn', 'rankedBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = false; });
+  ['createBtn', 'createBtn2', 'joinBtn', 'rankedBtn', 'rkGuestBtn', 'rkLoginBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = false; });
   rankedMode = false; rankedState = null; rankedResult = null; rankedElo = null;
   setLobbyMsg(msgText || '');
 }
@@ -764,7 +770,16 @@ function renderTeamLobby() {
     gsw.disabled = !iAmHost;
     gsw.onchange = iAmHost ? () => {
       roomGuide = gsw.checked;
-      send({ t: 'roomcfg', guide: roomGuide });
+      send({ t: 'roomcfg', guide: roomGuide, series: roomSeries });
+    } : null;
+  }
+  const ssw = document.getElementById('tlSeries');
+  if (ssw) {
+    ssw.checked = roomSeries;
+    ssw.disabled = !iAmHost;
+    ssw.onchange = iAmHost ? () => {
+      roomSeries = ssw.checked;
+      send({ t: 'roomcfg', guide: roomGuide, series: roomSeries });
     } : null;
   }
 
@@ -838,7 +853,7 @@ function hostStart2v2() {
     order = [1, 2];
     for (const p of lobbyRoster) pl[p.no] = { name: p.name, team: p.no };
   }
-  const msg = { t: 'start', players: pl, order, startTurn: order[0], slots: roomSlots, guide: roomGuide };
+  const msg = { t: 'start', players: pl, order, startTurn: order[0], slots: roomSlots, guide: roomGuide, series: roomSeries };
   send(msg);
   if (OrbitNet.markStarted) OrbitNet.markStarted();
   applyStart(msg);
@@ -1269,10 +1284,17 @@ function updateHUD() {
     buildChips(document.getElementById('chips' + side), g);
   }
 
-  document.getElementById('sbSeries').textContent = T('sb.series', { n: SERIES_GAMES });
-  document.getElementById('scoreL').textContent = matchScore[oppTeam];
-  document.getElementById('scoreR').textContent = matchScore[myTeam];
-  buildDashes(oppTeam, myTeam);
+  if (seriesOn()) {
+    document.getElementById('sbSeries').textContent = T('sb.series', { n: SERIES_GAMES });
+    document.getElementById('scoreL').textContent = matchScore[oppTeam];
+    document.getElementById('scoreR').textContent = matchScore[myTeam];
+    buildDashes(oppTeam, myTeam);
+  } else {
+    document.getElementById('sbSeries').textContent = T('sb.single');
+    document.getElementById('scoreL').textContent = '';
+    document.getElementById('scoreR').textContent = '';
+    const dl = document.getElementById('dashes'); if (dl) dl.innerHTML = '';
+  }
 
   document.getElementById('turnPill').classList.toggle('mine', currentTurn === myNo && !game.gameOver);
   document.getElementById('statusText').textContent = bannerText();
@@ -1306,8 +1328,11 @@ function startGame() {
 function showEnd() {
   exitLock(); // libera o cursor na hora (pra clicar no overlay de fim de jogo)
   // Conta a vitória na série (determinístico → todos os lados incrementam igual).
-  matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
-  matchOver = matchScore[game.winner] >= SERIES_TARGET;
+  // Partida ÚNICA (bot/ranqueado/sala com série desligada): sem placar de série.
+  if (seriesOn()) {
+    matchScore[game.winner] = (matchScore[game.winner] || 0) + 1;
+    matchOver = matchScore[game.winner] >= SERIES_TARGET;
+  } else matchOver = false;
   const won = game.winner === teamOf(myNo); // vitória do SEU time (1v1: você)
   if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
   endWon = won;
@@ -1333,6 +1358,12 @@ function renderEndTexts() {
     btn.textContent = T('rk.again');
     return;
   }
+  if (!seriesOn()) { // partida única (bot ou sala sem série)
+    el.textContent = T((endWon ? 'end.wonGame.' : 'end.lostGame.') + who);
+    m.textContent = game.lastMsg || '';
+    btn.textContent = T('btn.playAgain');
+    return;
+  }
   if (matchOver) {
     el.textContent = T((endWon ? 'end.wonSeries.' : 'end.lostSeries.') + who);
     m.textContent = T('end.finalScore', { a: matchScore[1], b: matchScore[2] }) + ' ' + game.lastMsg;
@@ -1354,6 +1385,9 @@ function doRematch(initiator) {
 // ===========================================================================
 // Lê o nome; se vazio, avisa e destaca o campo (nome é obrigatório p/ jogar).
 function getNameOrWarn() {
+  // Logado: o nome vem da CONTA (o campo de apelido nem aparece).
+  const u = window.OrbitAuth && OrbitAuth.user();
+  if (u && u.displayName) return u.displayName.slice(0, 20);
   const v = (document.getElementById('name').value || '').trim().slice(0, 20);
   if (!v) {
     setLobbyMsg(T('lm.nameRequired'));
@@ -1564,7 +1598,7 @@ function init() {
   canvas.addEventListener('touchmove', (e) => { e.preventDefault(); onTouchMove(e); }, { passive: false });
   canvas.addEventListener('touchend', (e) => { e.preventDefault(); onTouchEnd(e); }, { passive: false });
 
-  const lockInputs = () => { ['createBtn', 'createBtn2', 'joinBtn', 'rankedBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = true; }); };
+  const lockInputs = () => { ['createBtn', 'createBtn2', 'joinBtn', 'rankedBtn', 'rkGuestBtn', 'rkLoginBtn'].forEach((id) => { const b = document.getElementById(id); if (b) b.disabled = true; }); };
   document.getElementById('name').addEventListener('input', () => { document.getElementById('name').classList.remove('err'); setLobbyMsg(''); });
 
   // ---- Preferências persistidas no navegador (voltam na próxima visita) ----
@@ -1592,12 +1626,88 @@ function init() {
     if (window.OrbitAudio) OrbitAudio.unlock();
     const nm = getNameOrWarn(); if (!nm) return;
     botLevel = null; myName = nm; iAmHost = true; roomSlots = slots; // PvP
-    teamSel = {}; lobbyRoster = []; roomGuide = true;
+    teamSel = {}; lobbyRoster = []; roomGuide = true; roomSeries = true;
     roomInput = OrbitNet.makeCode();
     lockInputs();
     setLobbyMsg(slots === 4 ? T('lm.created4') : T('lm.created2'));
     hostRoom(slots);
   };
+  // ---- ABAS do menu (Jogar / Ranqueada / Treino) ---------------------------
+  const TABS = { tabPlay: 'panelPlay', tabRanked: 'panelRanked', tabBot: 'panelBot' };
+  for (const [btnId, panelId] of Object.entries(TABS)) {
+    const b = document.getElementById(btnId);
+    if (b) b.addEventListener('click', () => {
+      for (const [bi, pi] of Object.entries(TABS)) {
+        document.getElementById(bi).classList.toggle('sel', bi === btnId);
+        document.getElementById(pi).classList.toggle('hidden', pi !== panelId);
+      }
+    });
+  }
+
+  // ---- CONTA: reflete o estado de login na UI ------------------------------
+  const authUI = (u) => {
+    const logged = !!u;
+    document.getElementById('acctLogged').classList.toggle('hidden', !logged);
+    document.getElementById('acctGuest').classList.toggle('hidden', logged);
+    document.getElementById('nickBlock').style.display = logged ? 'none' : '';
+    // painel ranqueado: cadeado p/ deslogado, fila p/ logado
+    document.getElementById('rkLockBox').style.display = logged ? 'none' : '';
+    document.getElementById('rkLoginBtn').classList.toggle('hidden', logged);
+    document.getElementById('rkGuestBtn').classList.toggle('hidden', logged);
+    document.getElementById('rankedBtn').classList.toggle('hidden', !logged);
+    if (!logged) return;
+    const nm = u.displayName || (u.email ? u.email.split('@')[0] : T('default.you'));
+    document.getElementById('acctName').textContent = nm + (u.isAnonymous ? ' 🎭' : '');
+    document.getElementById('acctInitial').textContent = (nm.trim().charAt(0) || '?').toUpperCase();
+    document.getElementById('acctElo').textContent = T('acct.loggedNoElo');
+    if (window.OrbitRanked && OrbitRanked.me) OrbitRanked.me().then((me) => {
+      if (me && typeof me.elo === 'number') document.getElementById('acctElo').textContent = T('acct.logged', { elo: Math.round(me.elo) });
+    }).catch(() => {});
+  };
+  if (window.OrbitAuth) OrbitAuth.onChange(authUI);
+
+  // ---- MODAL de login (e-mail/senha, criar conta, Google) ------------------
+  let authMode = 'signin'; // signin | signup
+  const authModalEl = document.getElementById('authModal');
+  const authErrEl = document.getElementById('authErr');
+  const setAuthMode = (m) => {
+    authMode = m;
+    document.getElementById('authNameRow').classList.toggle('hidden', m !== 'signup');
+    document.getElementById('authSubmitTxt').textContent = T(m === 'signup' ? 'auth.signup' : 'auth.signin');
+    document.getElementById('authSwapTxt').textContent = T(m === 'signup' ? 'auth.haveAccount' : 'auth.noAccount');
+    document.getElementById('authSwapLink').textContent = T(m === 'signup' ? 'auth.toSignin' : 'auth.create');
+    document.getElementById('authPass').setAttribute('autocomplete', m === 'signup' ? 'new-password' : 'current-password');
+    authErrEl.textContent = '';
+  };
+  const openAuth = () => { setAuthMode('signin'); authModalEl.classList.remove('hidden'); document.getElementById('authEmail').focus(); };
+  const closeAuth = () => authModalEl.classList.add('hidden');
+  document.getElementById('authClose').addEventListener('click', closeAuth);
+  authModalEl.addEventListener('click', (e) => { if (e.target === authModalEl) closeAuth(); });
+  document.getElementById('authSwapLink').addEventListener('click', (e) => { e.preventDefault(); setAuthMode(authMode === 'signup' ? 'signin' : 'signup'); });
+  const authBusy = (on) => { ['authSubmit', 'authGoogle'].forEach((id) => { document.getElementById(id).disabled = on; }); };
+  document.getElementById('authSubmit').addEventListener('click', async () => {
+    const email = document.getElementById('authEmail').value;
+    const pass = document.getElementById('authPass').value;
+    const nome = document.getElementById('authName').value;
+    if (authMode === 'signup' && !(nome || '').trim()) { authErrEl.textContent = T('auth.err.needName'); return; }
+    authErrEl.textContent = ''; authBusy(true);
+    try {
+      if (authMode === 'signup') await OrbitAuth.signUpEmail(nome, email, pass);
+      else await OrbitAuth.signInEmail(email, pass);
+      closeAuth();
+    } catch (e) { authErrEl.textContent = T(OrbitAuth.errKey(e)); }
+    authBusy(false);
+  });
+  document.getElementById('authGoogle').addEventListener('click', async () => {
+    authErrEl.textContent = ''; authBusy(true);
+    try { await OrbitAuth.signInGoogle(); closeAuth(); }
+    catch (e) { authErrEl.textContent = T(OrbitAuth.errKey(e)); }
+    authBusy(false);
+  });
+  document.getElementById('loginBtn').addEventListener('click', openAuth);
+  document.getElementById('rkLoginBtn').addEventListener('click', openAuth);
+  document.getElementById('logoutBtn').addEventListener('click', () => { if (window.OrbitAuth) OrbitAuth.signOut(); });
+
   // ---- RANQUEADO: busca partida com identidade verificada -----------------
   const startRanked = () => {
     if (window.OrbitAudio) OrbitAudio.unlock();
@@ -1605,12 +1715,19 @@ function init() {
     if (!window.OrbitRanked) { setLobbyMsg(T('rk.connFail')); return; }
     botLevel = null; myName = nm; iAmHost = false; roomSlots = 2;
     OrbitRanked.getToken(nm).then((tok) => {
-      if (!tok) { setLobbyMsg(T('rk.needLogin')); return; }
+      if (!tok) { openAuth(); return; }
       lockInputs();
       setLobbyMsg(T('rk.searching'));
       OrbitNet.playRanked(tok, nm, handleNet);
     });
   };
+  const rkGuest = document.getElementById('rkGuestBtn');
+  if (rkGuest) rkGuest.addEventListener('click', async () => {
+    if (window.OrbitAudio) OrbitAudio.unlock();
+    const nm = getNameOrWarn(); if (!nm) return; // convidado precisa do apelido
+    try { await OrbitAuth.signInGuest(nm); startRanked(); }
+    catch (e) { setLobbyMsg(T(OrbitAuth.errKey(e))); }
+  });
   window.rankedRequeue = () => { // "jogar de novo" do fim de partida ranqueada
     document.getElementById('endOverlay').classList.add('hidden');
     try { OrbitNet.leave(); } catch (e) {}

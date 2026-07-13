@@ -30,7 +30,7 @@ const SRC = path.join(__dirname, 'public');
 const OUT = path.join(__dirname, 'dist');
 
 // JS com lógica própria do jogo → minify + obfuscação leve
-const OBFUSCATE = ['rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'audio.js', 'menu.js'];
+const OBFUSCATE = ['rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'auth.js', 'audio.js', 'menu.js'];
 // Libs de terceiros / traduções / SW → só minify
 const MINIFY_ONLY = ['GLTFLoader.js', 'OBJLoader.js', 'i18n.js', 'table3d_collider.js', 'sw.js'];
 
@@ -116,7 +116,7 @@ async function main() {
   // 4) sw.js: VERSION = hash do shell buildado (cache busting automático)
   const swPath = path.join(OUT, 'sw.js');
   let sw = fs.readFileSync(swPath, 'utf8');
-  const shellFiles = ['index.html', 'rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js',
+  const shellFiles = ['index.html', 'rules.js', 'physics.js', 'game3d.js', 'bot.js', 'net.js', 'ranked.js', 'auth.js',
     'audio.js', 'menu.js', 'i18n.js', 'table3d_collider.js', 'GLTFLoader.js', 'OBJLoader.js'];
   const h = crypto.createHash('sha256');
   for (const f of shellFiles) { const p = path.join(OUT, f); if (fs.existsSync(p)) h.update(fs.readFileSync(p)); }
@@ -132,8 +132,8 @@ async function main() {
   X-Frame-Options: DENY
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-  Cross-Origin-Opener-Policy: same-origin
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: data: wss: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests
+  Cross-Origin-Opener-Policy: same-origin-allow-popups
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://cdn.jsdelivr.net https://unpkg.com https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; img-src 'self' data: blob:; media-src 'self' blob:; connect-src 'self' blob: data: wss: https:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; upgrade-insecure-requests
 `);
 
   // 6) relatório

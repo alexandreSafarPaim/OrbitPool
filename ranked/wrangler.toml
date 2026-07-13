@@ -28,15 +28,14 @@ database_id = "678ff534-aaea-4217-b577-fb57a0c3891d"
 [vars]
 # Origens permitidas (CORS) — inclua localhost só enquanto testa.
 ALLOWED_ORIGINS = "https://orbitpool.com.br,http://localhost:3000"
-# Preencha ao criar o projeto no console do Firebase (fase 3):
-FIREBASE_PROJECT_ID = ""
+FIREBASE_PROJECT_ID = "orbitpool-49e20"
 # NUNCA "true" em produção — usado apenas pelos testes locais.
 ALLOW_DEV_AUTH = "false"
 
 # Config só do `wrangler dev` local:
 [env.dev.vars]
 ALLOWED_ORIGINS = "*"
-FIREBASE_PROJECT_ID = ""
+FIREBASE_PROJECT_ID = "orbitpool-49e20"
 ALLOW_DEV_AUTH = "true"
 
 [env.dev]
