@@ -1,0 +1,33 @@
+- generic [active] [ref=f4e1]:
+  - generic:
+    - generic: OrbitPool
+    - generic:
+      - generic:
+        - generic:
+          - generic: P
+          - generic:
+            - generic:
+              - generic: Pro Bot
+              - generic: TURN
+            - generic: open table
+      - generic:
+        - generic: SINGLE GAME
+        - generic: x
+      - generic:
+        - generic:
+          - generic: A
+          - generic:
+            - generic:
+              - generic: Ace
+              - generic: YOU
+            - generic: open table
+    - button "📋 CONTROLS H" [ref=f4e4] [cursor=pointer]:
+      - generic [ref=f4e5]: 📋
+      - generic [ref=f4e6]: CONTROLS
+      - generic [ref=f4e7]: H
+    - generic:
+      - generic:
+        - generic: 🎱
+        - generic: PRO BOT'S TURN
+      - generic: Pro Bot's turn.
+  - text: 🤝 🖼

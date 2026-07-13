@@ -1,0 +1,81 @@
+- generic [active] [ref=f3e1]:
+  - generic:
+    - generic:
+      - generic:
+        - generic:
+          - generic: A
+          - generic:
+            - generic: Player
+            - generic: open table
+      - generic:
+        - generic: MELHOR DE 5
+        - generic:
+          - generic: "0"
+          - generic: x
+          - generic: "0"
+      - generic:
+        - generic:
+          - generic: V
+          - generic:
+            - generic: You
+            - generic: open table
+    - button "📋 CONTROLS H" [ref=f3e4] [cursor=pointer]:
+      - generic [ref=f3e5]: 📋
+      - generic [ref=f3e6]: CONTROLS
+      - generic [ref=f3e7]: H
+    - generic:
+      - generic:
+        - generic: 🎱
+        - generic: Connecting…
+  - generic [ref=f3e9]:
+    - generic [ref=f3e10]:
+      - generic [ref=f3e11]: 🍺 up for a game of pool?
+      - generic [ref=f3e12]:
+        - heading "OrbitPool — Play Free Online 3D 8-Ball Pool Multiplayer, right in your browser, no install and no sign-up" [level=1] [ref=f3e13]:
+          - text: OrbitPool
+          - generic [ref=f3e14]: — Play Free Online 3D 8-Ball Pool Multiplayer, right in your browser, no install and no sign-up
+        - generic [ref=f3e15]: ~ dive bar pool ~
+    - generic [ref=f3e16]:
+      - generic [ref=f3e17]:
+        - heading "Today's Menu" [level=2] [ref=f3e18]
+        - paragraph [ref=f3e19]: — pool night tonight —
+        - generic [ref=f3e21]:
+          - generic [ref=f3e22]: 👤
+          - generic [ref=f3e23]:
+            - generic [ref=f3e24]: Playing as guest
+            - generic [ref=f3e25]: sign in to save your ELO & stats
+          - button "Sign in" [ref=f3e26] [cursor=pointer]
+        - generic [ref=f3e27]:
+          - generic [ref=f3e28]: your nickname
+          - textbox "your nickname" [ref=f3e29]:
+            - /placeholder: e.g. Eightball Eddie
+            - text: Ace
+        - generic [ref=f3e30]:
+          - button "🎱 Play" [ref=f3e31] [cursor=pointer]
+          - button "🏆 Ranked" [ref=f3e32] [cursor=pointer]
+          - button "🤖 Practice" [ref=f3e33] [cursor=pointer]
+        - generic [ref=f3e34]:
+          - generic [ref=f3e35]:
+            - button "🎱 1v1 classic match" [ref=f3e36] [cursor=pointer]:
+              - generic [ref=f3e37]: 🎱 1v1
+              - generic [ref=f3e38]: classic match
+            - button "🤝 2v2 teams · 4 players" [ref=f3e39] [cursor=pointer]:
+              - generic [ref=f3e40]: 🤝 2v2
+              - generic [ref=f3e41]: teams · 4 players
+          - generic [ref=f3e42]: or join with a code
+          - generic [ref=f3e44]:
+            - textbox "K7QX" [ref=f3e45]
+            - button "Join" [ref=f3e46] [cursor=pointer]
+        - paragraph [ref=f3e47]
+        - text: 🤝 🖼
+      - generic [ref=f3e48]:
+        - generic [ref=f3e49]:
+          - group [ref=f3e50]:
+            - generic "ℹ About the game & FAQ" [ref=f3e51] [cursor=pointer]
+          - button "🌐 English ▾" [ref=f3e54] [cursor=pointer]:
+            - generic [ref=f3e55]: 🌐
+            - generic [ref=f3e56]: English
+            - generic [ref=f3e57]: ▾
+        - paragraph [ref=f3e58]:
+          - generic [ref=f3e59]: 🤝
+          - generic [ref=f3e60]: Casual games are peer-to-peer — just show up and play.

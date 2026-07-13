@@ -88,6 +88,24 @@ window.OrbitPortal = 'crazygames';
     },
   };
 
+  // ---- Multiplayer do portal: convite + instant multiplayer -------------
+  // Exigências do CrazyGames p/ jogos multiplayer: botão de convite (footer
+  // do site) com o código da sala, auto-join via link e IsInstantMultiplayer.
+  window.OrbitPortalGame = {
+    async inviteParam(name) {
+      try { await load(); return SDK().game.getInviteParam(name) || null; } catch (e) { return null; }
+    },
+    async instant() {
+      try { await load(); return !!SDK().game.isInstantMultiplayer; } catch (e) { return false; }
+    },
+    showInvite(code) {
+      load().then(() => { try { SDK().game.showInviteButton({ room: String(code) }); } catch (e) {} }).catch(() => {});
+    },
+    hideInvite() {
+      load().then(() => { try { SDK().game.hideInviteButton(); } catch (e) {} }).catch(() => {});
+    },
+  };
+
   // Exigência do portal: bloquear o scroll da página no iframe.
   window.addEventListener('wheel', (e) => { if (e.target && e.target.id === 'c') e.preventDefault(); }, { passive: false });
   window.addEventListener('keydown', (e) => {

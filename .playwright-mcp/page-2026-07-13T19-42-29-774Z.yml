@@ -1,0 +1,116 @@
+- generic [active] [ref=e1]:
+  - generic:
+    - generic: OrbitPool
+    - generic:
+      - generic:
+        - generic:
+          - generic: A
+          - generic:
+            - generic: Jogador
+            - generic: mesa aberta
+      - generic:
+        - generic: MELHOR DE 5
+        - generic:
+          - generic: "0"
+          - generic: x
+          - generic: "0"
+      - generic:
+        - generic:
+          - generic: V
+          - generic:
+            - generic:
+              - generic: Você
+              - generic: VOCÊ
+            - generic: mesa aberta
+    - button "📋 CONTROLES H" [ref=e4] [cursor=pointer]:
+      - generic [ref=e5]: 📋
+      - generic [ref=e6]: CONTROLES
+      - generic [ref=e7]: H
+    - generic:
+      - generic:
+        - generic: 🎱
+        - generic: Conectando...
+  - generic [ref=e9]:
+    - generic [ref=e10]:
+      - generic [ref=e11]: 🍺 bora jogar uma sinuca?
+      - generic [ref=e12]:
+        - heading "OrbitPool — Jogue Sinuca 8-Ball 3D Multiplayer Online Grátis, direto no navegador, sem instalar e sem cadastro" [level=1] [ref=e13]:
+          - text: OrbitPool
+          - generic [ref=e14]: — Jogue Sinuca 8-Ball 3D Multiplayer Online Grátis, direto no navegador, sem instalar e sem cadastro
+        - generic [ref=e15]: ~ sinuca de boteco ~
+      - paragraph [ref=e16]: Aquele 8-ball raiz pra jogar com a galera. Cria a mesa, manda o código no grupo do zap e bora — sem cadastro, sem frescura.
+      - generic [ref=e17]:
+        - generic [ref=e18]: copo sujo
+        - generic [ref=e23]:
+          - generic [ref=e24]: "como joga:"
+          - generic [ref=e25]:
+            - generic [ref=e26]:
+              - generic [ref=e27]: MOUSE
+              - generic [ref=e28]: mira · ↑↓ câmera
+            - generic [ref=e29]:
+              - generic [ref=e30]: CTRL
+              - generic [ref=e31]: segura e puxa = força
+            - generic [ref=e32]:
+              - generic [ref=e33]: SHIFT
+              - generic [ref=e34]: ajusta o efeito
+            - generic [ref=e35]:
+              - generic [ref=e36]: TAB
+              - generic [ref=e37]: vê de cima
+            - generic [ref=e38]:
+              - generic [ref=e39]: SCROLL
+              - generic [ref=e40]: chega mais perto
+            - generic [ref=e41]:
+              - generic [ref=e42]: ESC
+              - generic [ref=e43]: pausa / sai
+    - generic [ref=e44]:
+      - generic [ref=e45]:
+        - heading "Menu do Dia" [level=2] [ref=e46]
+        - paragraph [ref=e47]: — hoje tem sinuca —
+        - generic [ref=e49]:
+          - generic [ref=e50]: 👤
+          - generic [ref=e51]:
+            - generic [ref=e52]: Jogando como convidado
+            - generic [ref=e53]: entre pra salvar ELO e stats
+          - button "Entrar" [ref=e54] [cursor=pointer]
+        - generic [ref=e55]:
+          - generic [ref=e56]: seu apelido
+          - textbox "seu apelido" [ref=e57]:
+            - /placeholder: "Ex: Zé da Tacada"
+        - generic [ref=e58]:
+          - button "🎱 Jogar" [ref=e59] [cursor=pointer]
+          - button "🏆 Ranqueada" [ref=e60] [cursor=pointer]
+          - button "🤖 Treino" [ref=e61] [cursor=pointer]
+        - generic [ref=e62]:
+          - generic [ref=e63]:
+            - button "🎱 1v1 partida clássica" [ref=e64] [cursor=pointer]:
+              - generic [ref=e65]: 🎱 1v1
+              - generic [ref=e66]: partida clássica
+            - button "🤝 2v2 duplas · 4 jogadores" [ref=e67] [cursor=pointer]:
+              - generic [ref=e68]: 🤝 2v2
+              - generic [ref=e69]: duplas · 4 jogadores
+          - generic [ref=e70]: ou entra por código
+          - generic [ref=e72]:
+            - textbox "K7QX" [ref=e73]
+            - button "Entrar" [ref=e74] [cursor=pointer]
+        - paragraph [ref=e75]
+        - paragraph [ref=e76]:
+          - text: 🤝
+          - generic [ref=e77]: Conexão direta entre vocês. Zero servidor, zero conta — é só chegar e jogar. Pra testar sozinho, abre em duas abas.
+        - paragraph [ref=e78]:
+          - text: 🖼
+          - generic [ref=e79]:
+            - text: "Mesa 3D: “Billiard Table” de"
+            - link "Futurealiti" [ref=e80] [cursor=pointer]:
+              - /url: https://sketchfab.com/futurealiti
+            - text: (
+            - link "CC-BY-4.0" [ref=e81] [cursor=pointer]:
+              - /url: https://creativecommons.org/licenses/by/4.0/
+            - text: ).
+      - generic:
+        - generic:
+          - group [ref=e82]:
+            - generic "ℹ Sobre o jogo & FAQ" [ref=e83] [cursor=pointer]
+          - button "🌐 Português ▾" [ref=e86] [cursor=pointer]:
+            - generic [ref=e87]: 🌐
+            - generic [ref=e88]: Português
+            - generic [ref=e89]: ▾
