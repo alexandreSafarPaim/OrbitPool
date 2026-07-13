@@ -1641,6 +1641,7 @@ function init() {
         document.getElementById(bi).classList.toggle('sel', bi === btnId);
         document.getElementById(pi).classList.toggle('hidden', pi !== panelId);
       }
+      if (btnId === 'tabRanked' && window.OrbitAuth && OrbitAuth.user()) refreshRkStats();
     });
   }
 
@@ -1655,13 +1656,23 @@ function init() {
     document.getElementById('rkLoginBtn').classList.toggle('hidden', logged);
     document.getElementById('rkGuestBtn').classList.toggle('hidden', logged);
     document.getElementById('rankedBtn').classList.toggle('hidden', !logged);
+    document.getElementById('rkStats').classList.toggle('hidden', !logged);
     if (!logged) return;
     const nm = u.displayName || (u.email ? u.email.split('@')[0] : T('default.you'));
     document.getElementById('acctName').textContent = nm + (u.isAnonymous ? ' 🎭' : '');
     document.getElementById('acctInitial').textContent = (nm.trim().charAt(0) || '?').toUpperCase();
     document.getElementById('acctElo').textContent = T('acct.loggedNoElo');
-    if (window.OrbitRanked && OrbitRanked.me) OrbitRanked.me().then((me) => {
-      if (me && typeof me.elo === 'number') document.getElementById('acctElo').textContent = T('acct.logged', { elo: Math.round(me.elo) });
+    refreshRkStats();
+  };
+  // Busca ELO/posição/V-D e preenche a linha da conta + cartão da aba ranqueada.
+  const refreshRkStats = () => {
+    if (!window.OrbitRanked || !OrbitRanked.me) return;
+    OrbitRanked.me().then((me) => {
+      if (!me) return;
+      if (typeof me.elo === 'number') document.getElementById('acctElo').textContent = T('acct.logged', { elo: Math.round(me.elo) });
+      document.getElementById('rkStatElo').textContent = Math.round(me.elo);
+      document.getElementById('rkStatPos').textContent = me.placed && me.rank ? '#' + me.rank + '/' + me.total : '—';
+      document.getElementById('rkStatRec').textContent = me.placed ? me.wins + ' · ' + me.losses : T('rk.unplaced');
     }).catch(() => {});
   };
   if (window.OrbitAuth) OrbitAuth.onChange(authUI);
