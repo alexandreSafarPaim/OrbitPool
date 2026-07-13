@@ -138,6 +138,14 @@
     .menuPanel { margin-top: 14px; animation: tabIn .18s ease; }
     .menuPanel.hidden { display: none; }
     @keyframes tabIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+    .rkStats { padding: 10px 14px 12px; background: rgba(143,227,255,.06);
+      border: 1px solid rgba(143,227,255,.25); border-radius: 12px; }
+    .rkStats.hidden { display: none; }
+    .rkStatsTitle { font-family: 'Permanent Marker', cursive; font-size: 12px; color: #8fe3ff; margin-bottom: 6px; }
+    .rkStatsRow { display: flex; gap: 8px; }
+    .rkStat { flex: 1; text-align: center; line-height: 1.15; }
+    .rkStat b { display: block; font-size: 20px; color: #f3ecdb; font-family: 'Oswald', sans-serif; }
+    .rkStat span { font-size: 10.5px; letter-spacing: .06em; text-transform: uppercase; color: #b7a988; }
     .rkLock { display: flex; align-items: center; gap: 12px; padding: 12px 14px;
       background: rgba(255,210,74,.08); border: 1.5px dashed rgba(255,210,74,.4); border-radius: 12px; }
     .rkLockIco { font-size: 22px; }
@@ -908,6 +916,14 @@
             </div>
             <button id="rkLoginBtn" class="ctaBtn">🔑 <span data-i18n="rk.loginCta">Entrar pra jogar ranqueada</span></button>
             <button id="rkGuestBtn" class="ghostFull">🎭 <span data-i18n="rk.guestCta">Jogar ranqueada como convidado</span></button>
+            <div id="rkStats" class="rkStats hidden">
+              <div class="rkStatsTitle" data-i18n="rk.you">sua temporada</div>
+              <div class="rkStatsRow">
+                <div class="rkStat"><b id="rkStatElo">—</b><span data-i18n="rk.stElo">ELO</span></div>
+                <div class="rkStat"><b id="rkStatPos">—</b><span data-i18n="rk.stPos">posição</span></div>
+                <div class="rkStat"><b id="rkStatRec">—</b><span data-i18n="rk.stRec">V · D</span></div>
+              </div>
+            </div>
             <button id="rankedBtn" class="ctaBtn hidden">🏆 <span data-i18n="rk.queueCta">Entrar na fila 1v1 · vale ELO</span></button>
             <button id="lbBtn" class="ghostFull">📋 <span data-i18n="rk.lbCta">Ver ranking da temporada</span></button>
           </div>

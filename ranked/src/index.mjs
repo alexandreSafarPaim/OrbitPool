@@ -54,10 +54,12 @@ export default {
       const token = authz.startsWith('Bearer ') ? authz.slice(7) : url.searchParams.get('token');
       const user = await verifyToken(token, env);
       if (!user) return json({ error: 'não autenticado' }, 401, h);
-      const s = await getStats(env.DB, user.id);
+      const r = await getStats(env.DB, user.id);
+      const s = r.stats;
       return json({
         id: user.id, name: (s && s.name) || user.name,
         elo: s ? s.elo : BASE_ELO, wins: s ? s.wins : 0, losses: s ? s.losses : 0,
+        rank: s ? r.rank : null, total: r.total, placed: !!s,
       }, 200, h);
     }
 

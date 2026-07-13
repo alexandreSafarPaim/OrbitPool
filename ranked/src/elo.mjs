@@ -71,8 +71,17 @@ export async function recordResult(db, winner, loser, reason = 'game') {
 
 export async function getStats(db, id) {
   const season = currentSeason();
-  return db.prepare('SELECT name, elo, wins, losses FROM players WHERE id = ? AND season = ?')
+  const s = await db.prepare('SELECT name, elo, wins, losses FROM players WHERE id = ? AND season = ?')
     .bind(id, season).first();
+  const total = await db.prepare('SELECT COUNT(*) AS c FROM players WHERE season = ?')
+    .bind(season).first();
+  if (!s) return { stats: null, total: total ? total.c : 0 };
+  // posição = 1 + quantos estão à frente (mesmo critério do leaderboard)
+  const ahead = await db.prepare(
+    `SELECT COUNT(*) AS c FROM players
+     WHERE season = ?1 AND (elo > ?2 OR (elo = ?2 AND wins > ?3))`
+  ).bind(season, s.elo, s.wins).first();
+  return { stats: s, rank: (ahead ? ahead.c : 0) + 1, total: total ? total.c : 0 };
 }
 
 export async function leaderboard(db, limit = 50) {
