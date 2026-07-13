@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://orbitpool.pages.dev/sitemap.xml
+Sitemap: https://orbitpool.com.br/sitemap.xml
