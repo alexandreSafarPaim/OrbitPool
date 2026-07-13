@@ -739,7 +739,7 @@ function applyStart(msg) {
 function abandonRoom(msgText) {
   try { if (OrbitNet.leave) OrbitNet.leave(); } catch (e) {}
   if (window.OrbitAds) OrbitAds.gameplayStop(); // portal: voltou ao menu
-  if (window.OrbitPortalGame) OrbitPortalGame.hideInvite();
+  if (window.OrbitPortalGame) OrbitPortalGame.leftRoom();
   myNo = 0; iAmHost = false; lobbyRoster = []; teamSel = {}; roomGuide = true; roomSeries = true;
   const tl = document.getElementById('teamLobby'); if (tl) tl.classList.add('hidden');
   const rs = document.getElementById('roomShare'); if (rs) rs.hidden = true;
@@ -1326,7 +1326,7 @@ function startGame() {
   if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   for (const b of balls) { const m = ballMeshes[b.n]; if (m) { m.quaternion.set(0, 0, 0, 1); m.position.set(b.x - W / 2, R, b.y - H / 2); m.visible = true; } }
   if (window.OrbitAds) OrbitAds.gameplayStart(); // portal: sessão de jogo começou
-  if (window.OrbitPortalGame) OrbitPortalGame.hideInvite(); // partida começou
+  if (window.OrbitPortalGame) OrbitPortalGame.matchStarted(); // sala fecha p/ novos jogadores
   updateHUD();
   maybeBotTurn();
 }
@@ -1341,6 +1341,9 @@ function showEnd() {
   } else matchOver = false;
   const won = game.winner === teamOf(myNo); // vitória do SEU time (1v1: você)
   if (window.OrbitAudio) { won ? OrbitAudio.win() : OrbitAudio.lose(); }
+  // Confete do portal SÓ no momento especial: vitória da SÉRIE (melhor de 3)
+  // ou da partida única (bot/ranqueada/sala sem série) — nunca a cada jogo.
+  if (won && (!seriesOn() || matchOver) && window.OrbitPortalGame) OrbitPortalGame.happy();
   endWon = won;
   renderEndTexts();
   document.getElementById('rematchMsg').textContent = '';
@@ -1590,6 +1593,24 @@ function init() {
   loadEnvironment(); // fundo 360° do bar (se houver arquivo em env/)
   camPos.set(0, 780, 900); camLook.set(0, 0, 0);
   if (window.OrbitAds) OrbitAds.ready(); // portal: fim do loading (loadingStop)
+  // SITE: link de convite ?room=CODIGO → auto-join (sem SDK; funciona em
+  // qualquer lugar). No portal o fluxo equivalente usa o SDK logo abaixo.
+  if (!window.OrbitPortalGame) {
+    const roomParam = new URLSearchParams(location.search).get('room');
+    if (roomParam) {
+      const code = roomParam.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
+      if (code.length >= 3) {
+        document.getElementById('joinCode').value = code;
+        const nickEl = document.getElementById('name');
+        const acct = window.OrbitAuth && OrbitAuth.user && OrbitAuth.user();
+        if ((acct && acct.displayName) || (nickEl.value || '').trim()) {
+          document.getElementById('joinBtn').click(); // nome ok → entra direto
+        } else {
+          setLobbyMsg(T('lm.nameRequired')); nickEl.focus(); // só falta o apelido
+        }
+      }
+    }
+  }
   // Portal: entrou por link de convite → auto-join; instant multiplayer →
   // cria a sala 1v1 direto (o líder da party compartilha pelo botão do site).
   if (window.OrbitPortalGame) (async () => {
@@ -1601,14 +1622,19 @@ function init() {
       nickEl.value = 'Player' + Math.floor(100 + Math.random() * 900);
       return true;
     };
+    const goJoin = (code) => {
+      if (phase !== 'lobby') return; // no meio de uma partida não puxa o jogador
+      ensureNick();
+      document.getElementById('joinCode').value = String(code).toUpperCase().slice(0, 8);
+      document.getElementById('joinBtn').click();
+    };
+    OrbitPortalGame.onJoinRequest(goJoin); // convites recebidos em tempo real
     const invited = await OrbitPortalGame.inviteParam('room');
     if (invited) {
-      ensureNick();
-      document.getElementById('joinCode').value = String(invited).toUpperCase().slice(0, 8);
-      document.getElementById('joinBtn').click();
+      goJoin(invited);
     } else if (await OrbitPortalGame.instant()) {
       ensureNick();
-      document.getElementById('createBtn').click(); // sala 1v1 + botão de convite
+      document.getElementById('createBtn').click(); // sala 1v1 + convite ativo
     }
   })();
   resize(); window.addEventListener('resize', resize);
@@ -1833,8 +1859,12 @@ function init() {
     lockInputs();
     setLobbyMsg(T('lm.connectingRoom', { code: code })); joinRoom();
   });
+  const inviteURL = (code) => {
+    if (window.OrbitPortalGame) { const l = OrbitPortalGame.inviteLink(code); if (l) return l; }
+    return location.origin + location.pathname + '?room=' + encodeURIComponent(code);
+  };
   document.getElementById('copyCodeBtn').addEventListener('click', () => {
-    const code = document.getElementById('roomCodeVal').textContent;
+    const code = inviteURL(document.getElementById('roomCodeVal').textContent);
     const btn = document.getElementById('copyCodeBtn');
     const done = () => { btn.textContent = T('btn.copied'); setTimeout(() => { btn.textContent = T('btn.copy'); }, 1500); };
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(done).catch(done);
@@ -1847,7 +1877,7 @@ function init() {
   const rtEl = document.getElementById('roomTag');
   if (rtEl) rtEl.addEventListener('click', () => {
     const done = () => { setStatus('Código ' + roomInput + ' copiado!'); };
-    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(roomInput).then(done).catch(done);
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(inviteURL(roomInput)).then(done).catch(done);
     else done();
   });
 

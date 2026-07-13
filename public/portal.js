@@ -11,6 +11,15 @@
 
 window.OrbitPortal = 'crazygames';
 
+// A build do portal não inclui as músicas (direitos) — zera o volume da
+// música para o player nem tentar carregar (evita 404 no console do QA).
+(function muteMusicOnPortal() {
+  const t = setInterval(() => {
+    if (window.OrbitAudio) { clearInterval(t); try { OrbitAudio.setVolume('music', 0); } catch (e) {} }
+  }, 100);
+  setTimeout(() => clearInterval(t), 10000);
+})();
+
 (function () {
   const SDK = () => (window.CrazyGames && window.CrazyGames.SDK) || null;
   let ready = null, sdkUser = null;
@@ -64,7 +73,9 @@ window.OrbitPortal = 'crazygames';
   // ---- OrbitAds: eventos + intersticial --------------------------------
   let lastAd = 0, inAd = false;
   const AD_COOLDOWN = 150000; // 2,5 min entre intersticiais (além do controle do SDK)
-  const canSDK = () => { const s = SDK(); return s && (s.environment === 'crazygames' || s.environment === 'local'); };
+  // 'disabled' = embed fora do CrazyGames; em qualquer outro ambiente
+  // (crazygames, local, QA Tool) o SDK decide — nós só tentamos.
+  const canSDK = () => { const s = SDK(); return s && s.environment !== 'disabled'; };
 
   window.OrbitAds = {
     ready() { load().then(() => { try { SDK().game.loadingStop(); } catch (e) {} }).catch(() => {}); },
@@ -82,15 +93,17 @@ window.OrbitPortal = 'crazygames';
         SDK().ad.requestAd('midgame', {
           adStarted: () => { if (window.OrbitAudio && !wasMuted) OrbitAudio.setMuted(true); },
           adFinished: done,
-          adError: done,
+          adError: (e) => { console.warn('OrbitPool: midgame adError —', e && (e.code || e.message || e)); done(); },
         });
-      } catch (e) { done(); }
+      } catch (e) { console.warn('OrbitPool: requestAd falhou —', e && e.message); done(); }
     },
   };
 
-  // ---- Multiplayer do portal: convite + instant multiplayer -------------
-  // Exigências do CrazyGames p/ jogos multiplayer: botão de convite (footer
-  // do site) com o código da sala, auto-join via link e IsInstantMultiplayer.
+  // ---- Multiplayer do portal (API nova: Room Data) -----------------------
+  // updateRoom/leftRoom alimentam o convite nativo, notificações e "jogar
+  // com amigos" do portal; addJoinRoomListener recebe convites em tempo real
+  // (o jogador pode ser puxado pra sala do amigo mesmo já estando no jogo).
+  let curRoom = null, curLink = null;
   window.OrbitPortalGame = {
     async inviteParam(name) {
       try { await load(); return SDK().game.getInviteParam(name) || null; } catch (e) { return null; }
@@ -98,11 +111,41 @@ window.OrbitPortal = 'crazygames';
     async instant() {
       try { await load(); return !!SDK().game.isInstantMultiplayer; } catch (e) { return false; }
     },
+    // sala aberta no lobby → anunciada como joinable (convite ativo).
+    // O link de convite é PRÉ-gerado aqui (não depende de clique) — assim o
+    // botão "copiar" responde na hora e o SDK registra o uso de inviteLink.
     showInvite(code) {
-      load().then(() => { try { SDK().game.showInviteButton({ room: String(code) }); } catch (e) {} }).catch(() => {});
+      curRoom = String(code);
+      load().then(() => {
+        try { SDK().game.updateRoom({ roomId: curRoom, isJoinable: true, inviteParams: { room: curRoom } }); } catch (e) {}
+        try { curLink = SDK().game.inviteLink({ room: curRoom }) || null; } catch (e) { curLink = null; }
+      }).catch(() => {});
     },
-    hideInvite() {
-      load().then(() => { try { SDK().game.hideInviteButton(); } catch (e) {} }).catch(() => {});
+    // link de convite do portal para o botão "copiar" dentro do jogo
+    inviteLink(code) {
+      if (curLink && String(code) === curRoom) return curLink;
+      try { return SDK().game.inviteLink({ room: String(code) }); } catch (e) { return null; }
+    },
+    // a partida começou: sala segue existindo, mas ninguém mais entra
+    matchStarted() {
+      if (!curRoom) return;
+      load().then(() => { try { SDK().game.updateRoom({ isJoinable: false }); } catch (e) {} }).catch(() => {});
+    },
+    // jogador saiu/abandonou a sala
+    leftRoom() {
+      if (!curRoom) return;
+      curRoom = null;
+      load().then(() => { try { SDK().game.leftRoom(); } catch (e) {} }).catch(() => {});
+    },
+    // celebração do portal (confete) — usar com parcimônia
+    happy() {
+      load().then(() => { try { SDK().game.happytime(); } catch (e) {} }).catch(() => {});
+    },
+    // convite recebido com o jogo JÁ aberto → repassa ao jogo via evento
+    onJoinRequest(cb) {
+      load().then(() => {
+        try { SDK().game.addJoinRoomListener((params) => { if (params && params.room) cb(String(params.room)); }); } catch (e) {}
+      }).catch(() => {});
     },
   };
 
