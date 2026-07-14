@@ -1326,6 +1326,7 @@ function startGame() {
   if (window.OrbitAudio) OrbitAudio.startMusic(); // música só a partir daqui
   for (const b of balls) { const m = ballMeshes[b.n]; if (m) { m.quaternion.set(0, 0, 0, 1); m.position.set(b.x - W / 2, R, b.y - H / 2); m.visible = true; } }
   if (window.OrbitAds) OrbitAds.gameplayStart(); // portal: sessão de jogo começou
+  if (window.OrbitMetrics) OrbitMetrics.log('match_start', { mode: rankedMode ? 'ranked' : (botLevel ? 'bot_' + botLevel : (roomSlots === 4 ? 'room_2v2' : 'room_1v1')) });
   if (window.OrbitPortalGame) OrbitPortalGame.matchStarted(); // sala fecha p/ novos jogadores
   updateHUD();
   maybeBotTurn();
@@ -1333,6 +1334,7 @@ function startGame() {
 function showEnd() {
   exitLock(); // libera o cursor na hora (pra clicar no overlay de fim de jogo)
   if (window.OrbitAds) { OrbitAds.gameplayStop(); OrbitAds.midgame(); } // portal: intersticial entre partidas
+  if (window.OrbitMetrics) OrbitMetrics.log('match_end', { mode: rankedMode ? 'ranked' : (botLevel ? 'bot' : 'room'), won: game.winner === teamOf(myNo) });
   // Conta a vitória na série (determinístico → todos os lados incrementam igual).
   // Partida ÚNICA (bot/ranqueado/sala com série desligada): sem placar de série.
   if (seriesOn()) {
@@ -1789,6 +1791,7 @@ function init() {
       if (!tok) { openAuth(); return; }
       lockInputs();
       setLobbyMsg(T('rk.searching'));
+      if (window.OrbitMetrics) OrbitMetrics.log('ranked_queue');
       OrbitNet.playRanked(tok, nm, handleNet);
     });
   };

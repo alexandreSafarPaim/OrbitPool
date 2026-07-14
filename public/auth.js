@@ -24,7 +24,8 @@ window.OrbitAuth = (function () {
     appId: '1:1019606091962:web:f616a69f8b7e3dcfea5a83',
   };
   const CDN = 'https://www.gstatic.com/firebasejs/12.16.0/';
-  let A = null, auth = null, ready = null;
+  const MEASUREMENT_ID = 'G-H07E02GFYZ';
+  let A = null, auth = null, ready = null, app = null;
   const listeners = [];
   const notify = () => { const u = auth ? auth.currentUser : null; for (const cb of listeners) { try { cb(u); } catch (e) {} } };
 
@@ -33,7 +34,8 @@ window.OrbitAuth = (function () {
     ready = Promise.all([import(CDN + 'firebase-app.js'), import(CDN + 'firebase-auth.js')])
       .then(([appMod, authMod]) => {
         A = authMod;
-        auth = A.getAuth(appMod.initializeApp(CFG));
+        app = appMod.initializeApp(CFG);
+        auth = A.getAuth(app);
         return new Promise((res) => {
           let first = true;
           A.onAuthStateChanged(auth, () => { notify(); if (first) { first = false; res(); } });
@@ -60,6 +62,74 @@ window.OrbitAuth = (function () {
     if (/operation-not-allowed/.test(c)) return 'auth.err.provider';
     return 'auth.err.generic';
   }
+
+  // ---- Firebase Analytics COM CONSENTIMENTO (SÓ no site) -----------------
+  // LGPD: o GA4 usa cookies, então só liga depois do "Aceitar todos". A
+  // escolha fica em localStorage ('all' | 'essential'). Sem escolha ainda →
+  // banner. Eventos do jogo entram por OrbitMetrics.log() e são descartados
+  // se o jogador não consentiu.
+  const CONSENT_KEY = 'orbitpool.consent';
+  let analytics = null, logEventFn = null;
+  const pending = [];
+  window.OrbitMetrics = {
+    log(name, params) {
+      if (logEventFn && analytics) { try { logEventFn(analytics, name, params || {}); } catch (e) {} }
+      else if (pending.length < 20) pending.push([name, params]);
+    },
+  };
+
+  function startAnalytics() {
+    load().then(() => import(CDN + 'firebase-analytics.js')).then(async (an) => {
+      if (!(await an.isSupported().catch(() => false))) return;
+      analytics = an.initializeAnalytics(app, { config: { send_page_view: true } });
+      logEventFn = an.logEvent;
+      for (const [n, p2] of pending.splice(0)) window.OrbitMetrics.log(n, p2);
+    }).catch(() => {});
+  }
+
+  function consentBanner() {
+    const T = (k, fb) => (window.OrbitI18N ? OrbitI18N.t(k) : fb) || fb;
+    const bar = document.createElement('div');
+    bar.id = 'cookieBar';
+    bar.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:80;display:flex;flex-wrap:wrap;' +
+      'gap:10px;align-items:center;justify-content:center;padding:12px 16px calc(12px + env(safe-area-inset-bottom));' +
+      'background:rgba(10,14,12,.96);border-top:1px solid rgba(255,210,74,.35);' +
+      'font:14px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif;color:#e8e2d2;';
+    const txt = document.createElement('span');
+    txt.style.cssText = 'max-width:560px;';
+    txt.innerHTML = T('ck.msg', 'Usamos cookies de análise para entender como o jogo é usado.') +
+      ' <a href="/privacidade.html" style="color:#8fe3ff;">' + T('ck.more', 'Saiba mais') + '</a>';
+    const mk = (label, primary) => {
+      const b = document.createElement('button');
+      b.textContent = label;
+      b.style.cssText = 'padding:9px 16px;border-radius:999px;cursor:pointer;font-weight:600;font-size:13px;' +
+        (primary
+          ? 'border:none;background:linear-gradient(180deg,#ffd24a,#e69a1a);color:#3a1e05;'
+          : 'border:1px solid rgba(255,255,255,.3);background:transparent;color:#e8d9b5;');
+      return b;
+    };
+    const all = mk(T('ck.all', 'Aceitar todos'), true);
+    const ess = mk(T('ck.essential', 'Só essenciais'), false);
+    const done = (choice) => {
+      try { localStorage.setItem(CONSENT_KEY, choice); } catch (e) {}
+      bar.remove();
+      if (choice === 'all') startAnalytics();
+    };
+    all.addEventListener('click', () => done('all'));
+    ess.addEventListener('click', () => done('essential'));
+    bar.appendChild(txt); bar.appendChild(ess); bar.appendChild(all);
+    document.body.appendChild(bar);
+  }
+
+  (function initConsent() {
+    let choice = null;
+    try { choice = localStorage.getItem(CONSENT_KEY); } catch (e) {}
+    if (choice === 'all') startAnalytics();
+    else if (choice !== 'essential') {
+      if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', consentBanner);
+      else consentBanner();
+    }
+  })();
 
   return {
     onChange(cb) { listeners.push(cb); load().catch(() => cb(null)); },

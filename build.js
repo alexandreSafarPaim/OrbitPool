@@ -93,7 +93,7 @@ async function main() {
   // 1) copia tudo (assets); JS/HTML serão sobrescritos pelas versões buildadas
   copyTree(SRC, OUT);
   if (CG) { // portal: sem música (direitos), sem PWA, sem o auth do site
-    for (const f of ['sw.js', 'site.webmanifest', 'auth.js', 'robots.txt', 'sitemap.xml']) {
+    for (const f of ['sw.js', 'site.webmanifest', 'auth.js', 'robots.txt', 'sitemap.xml', 'privacidade.html']) {
       try { fs.rmSync(path.join(OUT, f)); } catch (e) {}
     }
     try { fs.rmSync(path.join(OUT, 'music'), { recursive: true }); } catch (e) {}
