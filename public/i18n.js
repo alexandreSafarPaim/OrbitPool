@@ -109,6 +109,10 @@ window.OrbitI18N = (function () {
       es: ' — Juega al Billar 8-Ball 3D Multijugador Online Gratis, en el navegador, sin instalar y sin registro',
       fr: ' — Jouez au Billard 8-Ball 3D Multijoueur en Ligne Gratuit, dans le navigateur, sans installation ni inscription',
     },
+    'ck.msg': { pt: 'Usamos cookies de análise para entender como o jogo é usado.', en: 'We use analytics cookies to understand how the game is used.', es: 'Usamos cookies de análisis para entender cómo se usa el juego.', fr: 'Nous utilisons des cookies d’analyse pour comprendre l’utilisation du jeu.' },
+    'ck.more': { pt: 'Saiba mais', en: 'Learn more', es: 'Más información', fr: 'En savoir plus' },
+    'ck.all': { pt: 'Aceitar todos', en: 'Accept all', es: 'Aceptar todo', fr: 'Tout accepter' },
+    'ck.essential': { pt: 'Só essenciais', en: 'Essential only', es: 'Solo esenciales', fr: 'Essentiels uniquement' },
     'about.privacy': { pt: 'Política de Privacidade', en: 'Privacy Policy', es: 'Política de Privacidad', fr: 'Politique de confidentialité' },
     'about.toggle': { pt: 'ℹ Sobre o jogo & FAQ', en: 'ℹ About the game & FAQ', es: 'ℹ Sobre el juego y FAQ', fr: 'ℹ À propos du jeu & FAQ' },
     'about.h2': {
