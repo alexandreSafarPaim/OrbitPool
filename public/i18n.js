@@ -109,6 +109,7 @@ window.OrbitI18N = (function () {
       es: ' — Juega al Billar 8-Ball 3D Multijugador Online Gratis, en el navegador, sin instalar y sin registro',
       fr: ' — Jouez au Billard 8-Ball 3D Multijoueur en Ligne Gratuit, dans le navigateur, sans installation ni inscription',
     },
+    'about.privacy': { pt: 'Política de Privacidade', en: 'Privacy Policy', es: 'Política de Privacidad', fr: 'Politique de confidentialité' },
     'about.toggle': { pt: 'ℹ Sobre o jogo & FAQ', en: 'ℹ About the game & FAQ', es: 'ℹ Sobre el juego y FAQ', fr: 'ℹ À propos du jeu & FAQ' },
     'about.h2': {
       pt: 'OrbitPool — sinuca 8-Ball 3D online e grátis',
