@@ -24,7 +24,8 @@ window.OrbitAuth = (function () {
     appId: '1:1019606091962:web:f616a69f8b7e3dcfea5a83',
   };
   const CDN = 'https://www.gstatic.com/firebasejs/12.16.0/';
-  let A = null, auth = null, ready = null;
+  const MEASUREMENT_ID = 'G-H07E02GFYZ';
+  let A = null, auth = null, ready = null, app = null;
   const listeners = [];
   const notify = () => { const u = auth ? auth.currentUser : null; for (const cb of listeners) { try { cb(u); } catch (e) {} } };
 
@@ -33,7 +34,8 @@ window.OrbitAuth = (function () {
     ready = Promise.all([import(CDN + 'firebase-app.js'), import(CDN + 'firebase-auth.js')])
       .then(([appMod, authMod]) => {
         A = authMod;
-        auth = A.getAuth(appMod.initializeApp(CFG));
+        app = appMod.initializeApp(CFG);
+        auth = A.getAuth(app);
         return new Promise((res) => {
           let first = true;
           A.onAuthStateChanged(auth, () => { notify(); if (first) { first = false; res(); } });
@@ -60,6 +62,24 @@ window.OrbitAuth = (function () {
     if (/operation-not-allowed/.test(c)) return 'auth.err.provider';
     return 'auth.err.generic';
   }
+
+  // ---- Firebase Analytics (SÓ no site — a build do portal usa portal.js) --
+  // Carrega junto com o app na primeira visita; eventos do jogo entram por
+  // OrbitMetrics.log(nome, params). Falha de CDN/adblock é silenciosa.
+  let analytics = null, logEventFn = null;
+  const pending = [];
+  window.OrbitMetrics = {
+    log(name, params) {
+      if (logEventFn && analytics) { try { logEventFn(analytics, name, params || {}); } catch (e) {} }
+      else if (pending.length < 20) pending.push([name, params]);
+    },
+  };
+  load().then(() => import(CDN + 'firebase-analytics.js')).then(async (an) => {
+    if (!(await an.isSupported().catch(() => false))) return;
+    analytics = an.initializeAnalytics(app, { config: { send_page_view: true } });
+    logEventFn = an.logEvent;
+    for (const [n, p2] of pending.splice(0)) window.OrbitMetrics.log(n, p2);
+  }).catch(() => {});
 
   return {
     onChange(cb) { listeners.push(cb); load().catch(() => cb(null)); },
