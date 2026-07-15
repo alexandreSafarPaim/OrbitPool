@@ -13,3 +13,4 @@ ranked/.wrangler/
 ranked/src/engine.mjs
 dist-cg/
 orbitpool-cg.zip
+.playwright-mcp/
