@@ -22,6 +22,7 @@ window.OrbitAuth = (function () {
     authDomain: 'orbitpool-49e20.firebaseapp.com',
     projectId: 'orbitpool-49e20',
     appId: '1:1019606091962:web:f616a69f8b7e3dcfea5a83',
+    measurementId: 'G-H07E02GFYZ',
   };
   const CDN = 'https://www.gstatic.com/firebasejs/12.16.0/';
   const MEASUREMENT_ID = 'G-H07E02GFYZ';
@@ -81,7 +82,7 @@ window.OrbitAuth = (function () {
   function startAnalytics() {
     load().then(() => import(CDN + 'firebase-analytics.js')).then(async (an) => {
       if (!(await an.isSupported().catch(() => false))) return;
-      analytics = an.initializeAnalytics(app, { config: { send_page_view: true } });
+      analytics = an.getAnalytics(app);
       logEventFn = an.logEvent;
       for (const [n, p2] of pending.splice(0)) window.OrbitMetrics.log(n, p2);
     }).catch(() => {});
